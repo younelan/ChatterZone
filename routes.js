@@ -199,11 +199,12 @@ class Routes {
 		if (FormHelper.isEmail(usrLogin) || FormHelper.isUsername(usrLogin)) {
 			try {
 				// Proceed with login logic
-				const isLoggedIn = await myuser.findUser({ login: usrLogin, password: usrPassword });
+				const user = await myuser.findUser(FormHelper.isEmail(usrLogin) ? { email: usrLogin } : { login: usrLogin });
+				const isPasswordMatch = user && (user.password === usrPassword || bcrypt.compareSync(usrPassword, user.password));
 
-				if (isLoggedIn) {
+				if (isPasswordMatch) {
 					// Set session user and redirect to home page
-					ctx.session.user = isLoggedIn;
+					ctx.session.user = user;
 					ctx.redirect('/');
 				} else {
 					// User not found, show login page
@@ -280,7 +281,7 @@ class Routes {
 			console.log("adding user");
 			// hash the password before saving
 			const hashed = bcrypt.hashSync(userInfo['password'], 10);
-			myuser.addUser({ login: userInfo['login'], email: userInfo['email'], firstname: userInfo['firstname'], lastname: userInfo['lastname'], password: hashed, confirm: userInfo['confirm'] },
+			await myuser.addUser({ login: userInfo['login'], email: userInfo['email'], firstname: userInfo['firstname'], lastname: userInfo['lastname'], password: hashed, confirm: userInfo['confirm'] },
 				async () => {
 					await this.showRegisterSuccess(ctx, ctx.request.body);
 					console.log("success in add");
@@ -305,11 +306,11 @@ class Routes {
 		}
 	}
 
-	setTheme(ctx) {
+	async setTheme(ctx) {
 		if (templateHelper.activeThemes.hasOwnProperty(ctx.params.theme)) {
 			ctx.session.theme = ctx.params.theme;
 		}
-		this.index(ctx);
+		await this.index(ctx);
 	}
 
 	async themes(ctx) {
@@ -343,7 +344,7 @@ class Routes {
 		if (mimeType) {
 			console.log(`${__dirname}/themes/${myTheme}/${filename}`);
 			try {
-				const fileData = await fs.promises.readFile(`${__dirname}/themes/${myTheme}/${filename}`, "binary");
+				const fileData = await fs.promises.readFile(path.join(__dirname, 'themes', myTheme, filename));
 				ctx.type = mimeType;
 				ctx.body = fileData;
 			} catch (err) {

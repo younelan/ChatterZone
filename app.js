@@ -1,122 +1,227 @@
-import Koa from 'koa';
-import Router from 'koa-router';
-import bodyParser from 'koa-bodyparser';
-import session from 'koa-session';
-import mount from 'koa-mount';
-import serve from 'koa-static';
-//const mount = require('koa-mount');
-
-import path from 'path';
-import passport from 'koa-passport';
-import LocalStrategy from 'passport-local';
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
 import Routes from './routes.js';
-import bcrypt from 'bcryptjs';
-import logger from 'koa-logger';
-
-const app = new Koa();
-const router = new Router();
-const routes = new Routes();
-
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const routes = new Routes();
 
-// Serve static files from the 'res' directory
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.tpl': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.txt': 'text/plain; charset=utf-8'
+};
 
-console.log(path.join(__dirname, 'res/'));
+// In-memory session store
+const sessions = new Map();
 
-//app.use(mount(path.join(__dirname, 'res/')));
-app.use(mount('/res', serve(path.join(__dirname, 'res'))));
+function getSession(req, res) {
+  const cookieHeader = req.headers.cookie || '';
+  const match = cookieHeader.match(/(?:^|;\s*)sid=([^;]+)/);
+  let sid = match ? match[1] : null;
 
-app.keys = ['your-secret-key'];
-app.use(session(app));
-app.use(logger());
-app.use(bodyParser());
-
-// Passport configuration
-passport.use(new LocalStrategy(async (username, password, done) => {
-const user = await routes.findUser(username);
-if (!user) {
-return done(null, false, { message: 'Incorrect username.' });
+  if (!sid || !sessions.has(sid)) {
+    sid = crypto.randomUUID();
+    sessions.set(sid, {});
+    res.setHeader('Set-Cookie', `sid=${sid}; HttpOnly; Path=/; SameSite=Lax`);
+  }
+  return sessions.get(sid);
 }
-const isValid = bcrypt.compareSync(password, user.password);
-if (!isValid) {
-return done(null, false, { message: 'Incorrect password.' });
-}
-return done(null, user);
-}));
 
-passport.serializeUser((user, done) => {
-done(null, user.username);
-});
+function parseBody(req) {
+  return new Promise((resolve) => {
+    if (req.method !== 'POST' && req.method !== 'PUT' && req.method !== 'PATCH') {
+      return resolve({});
+    }
 
-passport.deserializeUser(async (username, done) => {
-const user = await routes.findUser(username);
-done(null, user);
-});
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8');
+      const contentType = req.headers['content-type'] || '';
 
-app.use(passport.initialize());
-app.use(passport.session());
+      if (contentType.includes('application/json')) {
+        try {
+          return resolve(JSON.parse(raw));
+        } catch {
+          return resolve({});
+        }
+      }
 
-// Routes
-router.get('/favicon.ico', (ctx) => {
-ctx.status = 204;
-});
-
-router.get('/', async (ctx) => {
-  console.log("hi world")
-await routes.index(ctx);
-});
-
-// Serve static files from the 'themes' directory
-router.get('/themes/:theme/:file', async (ctx) => {
-  await routes.themes(ctx);
+      // Default to urlencoded form data
+      const parsed = {};
+      const params = new URLSearchParams(raw);
+      for (const [key, value] of params.entries()) {
+        parsed[key] = value;
+      }
+      resolve(parsed);
+    });
   });
-
-router.get('/settheme/:theme', async (ctx) => {
-await routes.setTheme(ctx);
-});
-
-router.get('/register', async (ctx) => {
-await routes.registerForm(ctx);
-});
-
-router.post('/register', async (ctx) => {
-await routes.registerUser(ctx);
-});
-
-router.post('/login', async (ctx, next) => {
-return passport.authenticate('local', (err, user, info) => {
-if (user) {
-ctx.login(user);
-ctx.redirect('/protected');
-} else {
-ctx.status = 401;
-ctx.body = info.message;
 }
-})(ctx, next);
-});
 
-router.get('/logoff', (ctx) => {
-ctx.logout();
-ctx.body = 'Logged out';
-});
+async function serveStaticFile(filePath, res) {
+  try {
+    const stat = await fs.promises.stat(filePath);
+    if (!stat.isFile()) return false;
 
-router.get('/people', async (ctx) => {
-await routes.listUsers(ctx);
-});
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Content-Length': stat.size
+    });
+    fs.createReadStream(filePath).pipe(res);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-router.get('/profile', async (ctx) => {
-await routes.listUsers(ctx);
-});
+const server = http.createServer(async (req, res) => {
+  const start = Date.now();
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const pathname = url.pathname;
+  const method = req.method;
 
-app.use(router.routes()).use(router.allowedMethods());
+  const session = getSession(req, res);
+  const body = await parseBody(req);
+
+  const isGetOrHead = method === 'GET' || method === 'HEAD';
+
+  // Minimal Koa-compatible context object
+  const ctx = {
+    req,
+    res,
+    session,
+    params: {},
+    request: {
+      body,
+      headers: req.headers
+    },
+    status: 200,
+    type: 'text/html; charset=utf-8',
+    body: null,
+    redirect(location) {
+      res.writeHead(302, { Location: location });
+      res.end();
+    }
+  };
+
+  try {
+    // 1. Static files under /res/
+    if (pathname.startsWith('/res/')) {
+      const relPath = pathname.slice('/res/'.length);
+      const safePath = path.normalize(relPath).replace(/^(\.\.[\/\\])+/, '');
+      const filePath = path.join(__dirname, 'res', safePath);
+      const served = await serveStaticFile(filePath, res);
+      if (served) {
+        console.log(`  <-- ${method} ${pathname} 200 ${Date.now() - start}ms`);
+        return;
+      }
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Not Found');
+      console.log(`  <-- ${method} ${pathname} 404 ${Date.now() - start}ms`);
+      return;
+    }
+
+    // 2. Favicon
+    if (pathname === '/favicon.ico') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    // 3. Theme assets: /themes/:theme/:file
+    const themeMatch = pathname.match(/^\/themes\/([^\/]+)\/([^\/]+)$/);
+    if (themeMatch && isGetOrHead) {
+      ctx.params = { theme: themeMatch[1], file: themeMatch[2] };
+      await routes.themes(ctx);
+    }
+    // 4. Set theme: /settheme/:theme
+    else if (pathname.startsWith('/settheme/') && isGetOrHead) {
+      const theme = pathname.slice('/settheme/'.length);
+      ctx.params = { theme };
+      await routes.setTheme(ctx);
+    }
+    // 5. Home
+    else if (pathname === '/' && isGetOrHead) {
+      await routes.index(ctx);
+    }
+    // 6. Register form & handler
+    else if (pathname === '/register' && isGetOrHead) {
+      await routes.registerForm(ctx);
+    } else if (pathname === '/register' && method === 'POST') {
+      await routes.registerUser(ctx);
+    }
+    // 7. Login
+    else if (pathname === '/login' && method === 'POST') {
+      await routes.loginUser(ctx);
+    }
+    // 8. Logoff
+    else if (pathname === '/logoff' && isGetOrHead) {
+      await routes.logoffUser(ctx);
+    }
+    // 9. People / Profile
+    else if ((pathname === '/people' || pathname === '/profile') && isGetOrHead) {
+      await routes.listUsers(ctx);
+    }
+    // 10. Fallback 404
+    else {
+      ctx.status = 404;
+      ctx.body = 'Not Found';
+    }
+
+    // If redirect or response was already sent
+    if (res.writableEnded) {
+      console.log(`  <-- ${method} ${pathname} ${res.statusCode} ${Date.now() - start}ms`);
+      return;
+    }
+
+    // Send response
+    if (ctx.type && !res.getHeader('Content-Type')) {
+      res.setHeader('Content-Type', ctx.type);
+    }
+    res.statusCode = ctx.status || 200;
+
+    if (method === 'HEAD') {
+      res.end();
+    } else if (Buffer.isBuffer(ctx.body)) {
+      res.end(ctx.body);
+    } else if (typeof ctx.body === 'string') {
+      res.end(ctx.body);
+    } else if (ctx.body !== null && ctx.body !== undefined) {
+      res.end(JSON.stringify(ctx.body));
+    } else {
+      res.end();
+    }
+
+    console.log(`  <-- ${method} ${pathname} ${res.statusCode} ${Date.now() - start}ms`);
+  } catch (err) {
+    console.error('Server error:', err);
+    if (!res.writableEnded) {
+      res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Internal Server Error');
+    }
+  }
+});
 
 // Start the server
 let port = process.env.PORT || 4000;
 const portIndex = process.argv.indexOf('-p');
-if (portIndex > -1) {
-  port = process.argv[portIndex + 1];
+if (portIndex > -1 && process.argv[portIndex + 1]) {
+  port = Number(process.argv[portIndex + 1]);
 }
-app.listen(port, () => {
-console.log(`Server is running on port ${port}`);
+
+server.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });

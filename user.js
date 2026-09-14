@@ -27,11 +27,11 @@ class MongoUser {
             const newUser = new User(userInfo);
             await newUser.save();
             console.log('User added successfully');
-            if (successCallback) successCallback();
+            if (successCallback) await successCallback();
             return true;
         } catch (error) {
             console.error('Error adding user:', error);
-            if (failureCallback) failureCallback();
+            if (failureCallback) await failureCallback();
             return false;
         }
     }

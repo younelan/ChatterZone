@@ -22,9 +22,7 @@
 		</div>
 		<div class=topdiv>
 			<div id='banner'>
-				<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.1/jquery.min.js"></script>
-				<script src='/res/jquery.cycle.all.min.js'></script>
-				<img  src=/res/sfbanner.jpg><br/>
+				<img src=/res/sfbanner.jpg><br/>
 				<div id="slideshow">
 					<div style='background-color:red;color:white'>
 						Find lost friends
@@ -45,18 +43,8 @@
 						Share with others
 					</div>	
 				</div>
-
-				<script>
-				$(function() {
-
-					$('#slideshow').cycle({ fx:'fade',timeout: 3000, cleartype: 1, speed: 1400, width:540,height:40 });
-
-				});
-
-				</script>
 				<br/>
-
-		</div>
+			</div>
 
 			<div class=topdivText>
 				<a href='/'><div class=siteTitle>{site_name}

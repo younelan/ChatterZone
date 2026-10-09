@@ -7,12 +7,14 @@ This is by no means complete but should give you an idea to get started with for
 - If you have a single theme, you probably wanna use something like pug 
 
 ## Highlights:
-- uses koa 
-- has a basic themes
-- authenticates using passport and mongoose
+- uses native node:http (no web framework)
+- has basic themes
+- authenticates using sessions and mongoose
 - rudimentary theme engine (basic string replace)
 - Shows how to create a simple member zone, storing the users in mongo db. 
 - features a buggy falling blocks game that is available if you are logged in to demonstrate a member only page
+
+this demo used to use koa/express but simplified to just use a db layer/crypt
 
 ## To use:
 - make sure node.js is installed and in your executable path

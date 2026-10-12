@@ -215,13 +215,52 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-// Start the server
-let port = process.env.PORT || 4000;
-const portIndex = process.argv.indexOf('-p');
-if (portIndex > -1 && process.argv[portIndex + 1]) {
-  port = Number(process.argv[portIndex + 1]);
+// Parse port from environment variable or command-line arguments:
+// Supports: PORT=5000, node app.js 5000, -p 5000, --port 5000, --port=5000
+function getPort() {
+  if (process.env.PORT) {
+    const p = parseInt(process.env.PORT, 10);
+    if (!isNaN(p)) return p;
+  }
+
+  const args = process.argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if ((arg === '-p' || arg === '--port') && args[i + 1]) {
+      const p = parseInt(args[i + 1], 10);
+      if (!isNaN(p)) return p;
+    }
+    if (arg.startsWith('--port=')) {
+      const p = parseInt(arg.split('=')[1], 10);
+      if (!isNaN(p)) return p;
+    }
+    if (/^\d+$/.test(arg)) {
+      const p = parseInt(arg, 10);
+      if (!isNaN(p)) return p;
+    }
+  }
+
+  return 4000;
 }
 
-server.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+// Start server with automatic collision fallback (tries port + 1 if in use)
+function startServer(initialPort) {
+  let currentPort = initialPort;
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`Port ${currentPort} is already in use. Retrying on port ${currentPort + 1}...`);
+      currentPort++;
+      server.listen(currentPort);
+    } else {
+      console.error('Server error:', err);
+    }
+  });
+
+  server.listen(currentPort, () => {
+    console.log(`Server is running on http://localhost:${currentPort}`);
+  });
+}
+
+const initialPort = getPort();
+startServer(initialPort);

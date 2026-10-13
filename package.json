@@ -1,7 +1,7 @@
 {
   "name": "node-login-app",
   "version": "1.0.0",
-  "description": "A lightweight login app using node:http",
+  "description": "A lightweight login app using node:http and node:sqlite",
   "main": "app.js",
   "type": "module",
   "scripts": {
@@ -9,12 +9,12 @@
   },
   "keywords": [
     "http",
+    "sqlite",
     "authentication"
   ],
   "author": "Youn Elan",
   "license": "MIT",
   "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "mongoose": "8.9.5"
+    "bcryptjs": "^2.4.3"
   }
 }

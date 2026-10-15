@@ -1,117 +1,87 @@
-import mongoose from 'mongoose';
+import { DatabaseSync } from 'node:sqlite';
+import path from 'node:path';
 
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const dbPath = path.join(__dirname, 'community.db');
 
-mongoose.connect('mongodb://localhost:27017/community', {
-}).then(() => {
-  console.log('Connected to MongoDB');
-}).catch((error) => {
-  console.error('Error connecting to MongoDB:', error);
-});
+// Connect to SQLite (creates the database file automatically if it doesn't exist)
+const db = new DatabaseSync(dbPath);
 
-// Define the schema for the User collection
-const userSchema = new mongoose.Schema({
-    login: { type: String, required: true },
-    email: { type: String, required: true },
-    firstname: { type: String, required: true },
-    lastname: { type: String, required: true },
-    password: { type: String, required: true },
-    confirm: { type: String, required: true },
-});
+// Automatically create the users table if it doesn't exist
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    login TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    firstname TEXT NOT NULL,
+    lastname TEXT NOT NULL,
+    password TEXT NOT NULL,
+    confirm TEXT
+  );
+`);
 
-// Create the User model using the schema
-const User = mongoose.model('User', userSchema);
+console.log('Connected to SQLite database at', dbPath);
 
-class MongoUser {
-    async addUser(userInfo, successCallback, failureCallback) {
-        try {
-            const newUser = new User(userInfo);
-            await newUser.save();
-            console.log('User added successfully');
-            if (successCallback) await successCallback();
-            return true;
-        } catch (error) {
-            console.error('Error adding user:', error);
-            if (failureCallback) await failureCallback();
-            return false;
-        }
+class SqliteUser {
+  async addUser(userInfo, successCallback, failureCallback) {
+    try {
+      const stmt = db.prepare(`
+        INSERT INTO users (login, email, firstname, lastname, password, confirm)
+        VALUES (@login, @email, @firstname, @lastname, @password, @confirm)
+      `);
+      stmt.run({
+        login: userInfo.login,
+        email: userInfo.email,
+        firstname: userInfo.firstname,
+        lastname: userInfo.lastname,
+        password: userInfo.password,
+        confirm: userInfo.confirm || ''
+      });
+      console.log('User added successfully');
+      if (successCallback) await successCallback();
+      return true;
+    } catch (error) {
+      console.error('Error adding user:', error);
+      if (failureCallback) await failureCallback(error);
+      return false;
     }
+  }
 
-    async findUser(query) {
-        try {
-			//console.log("hello from findUser")
-            const user = await User.findOne(query);
-			// console.log(user)
-			// console.log("found the user")
-            return user;
-        } catch (error) {
-            console.error('Error finding user:', error);
-            return null;
-        }
+  async findUser(query) {
+    try {
+      const keys = Object.keys(query);
+      if (keys.length === 0) return null;
+      const whereClause = keys.map(k => `${k} = ?`).join(' AND ');
+      const values = keys.map(k => query[k]);
+      const stmt = db.prepare(`SELECT * FROM users WHERE ${whereClause} LIMIT 1`);
+      const user = stmt.get(...values);
+      return user || null;
+    } catch (error) {
+      console.error('Error finding user:', error);
+      return null;
     }
+  }
 
-    async loginUser(credentials) {
-        try {
-            const user = await this.findUser(credentials);
-            return user;
-        } catch (error) {
-            console.error('Error logging in:', error);
-            return null;
-        }
+  async loginUser(credentials) {
+    try {
+      const user = await this.findUser(credentials);
+      return user;
+    } catch (error) {
+      console.error('Error logging in:', error);
+      return null;
     }
+  }
 
-    async listUsers() {
-        try {
-            const users = await User.find({});
-            return users;
-        } catch (error) {
-            console.error('Error listing users:', error);
-            return [];
-        }
+  async listUsers() {
+    try {
+      const stmt = db.prepare(`SELECT * FROM users ORDER BY id ASC`);
+      return stmt.all();
+    } catch (error) {
+      console.error('Error listing users:', error);
+      return [];
     }
-	/* old 
-    async findUser(criteria) {
-        try {
-            const users = await db.users.find(criteria);
-            return users || null;
-        } catch (error) {
-            console.error('Error finding user:', error);
-            return null;
-        }
-    }
-
-    async listUsers() {
-        try {
-            const users = await db.users.find({});
-            let content = '';
-            users.forEach(user => {
-                content += `<li>${user.firstname} ${user.lastname}</li>\n`;
-            });
-            return content;
-        } catch (error) {
-            console.error('Error fetching users:', error);
-            return null;
-        }
-    }
-
-    async addUser(user) {
-        try {
-            const isSaved = await db.users.save(user);
-            return isSaved;
-        } catch (error) {
-            console.error('Error saving user:', error);
-            return false;
-        }
-    }
+  }
 }
 
-
-
-	*/
-}
-
-export default MongoUser;
-export { MongoUser, User };
-
-// const myuser = new MongoUser();
-
-// export default myuser
+export default SqliteUser;
+export { SqliteUser, SqliteUser as MongoUser, db };

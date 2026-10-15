@@ -1,8 +1,8 @@
 
 import fs from 'fs';
 import path from 'path';
-import { MongoUser } from './user.js';
-const myuser = new MongoUser();
+import { SqliteUser } from './user.js';
+const myuser = new SqliteUser();
 
 import templateHelper from './template_helper.js';
 import FormHelper from './form_helper.js';
@@ -63,9 +63,15 @@ class Routes {
 		}
 	}
 
-	async showForm(ctx, body) {
+	async showForm(ctx, body = {}, errorMessage = '') {
 		try {
-			const userInfo = {};
+			const userInfo = {
+				login: body.login || '',
+				firstname: body.firstname || '',
+				lastname: body.lastname || '',
+				email: body.email || '',
+				error: errorMessage ? `<div style="color: red; font-weight: bold; margin: 10px 0; padding: 8px; background: #ffebee; border: 1px solid #ef9a9a; border-radius: 4px;">${errorMessage}</div>` : ''
+			};
 			const myvars = {
 				sidebar1: 'Join the community. Fill in the form and participate.',
 				content: templateHelper.render('views/registerform.html', userInfo),
@@ -245,55 +251,69 @@ class Routes {
 
 		for (const field in userFields) {
 			const fieldType = userFields[field];
-			const fieldValue = ctx.request.body[field] || '';
-			console.log(field + " " + fieldType + " " + fieldValue)
+			const fieldValue = (ctx.request.body[field] || '').trim();
+			console.log(field + " " + fieldType + " " + fieldValue);
 			switch (fieldType) {
 				case 'name':
 				case 'password':
 				case 'string':
 					userInfo[field] = fieldValue;
 					break;
-				case 'number':
-					const isValidNumber = FormHelper.isNumber(fieldValue);
-					if (isValidNumber) {
-						userInfo[field] = fieldValue;
-					}
-					break;
 				case 'username':
-					const isValidUsername = FormHelper.isUsername(fieldValue);
-					if (isValidUsername) {
+					if (FormHelper.isUsername(fieldValue)) {
 						userInfo[field] = fieldValue;
 					}
 					break;
 				case 'email':
-					const isValidEmail = FormHelper.isEmail(fieldValue);
-					if (isValidEmail) {
+					if (FormHelper.isEmail(fieldValue)) {
 						userInfo[field] = fieldValue;
 					}
 					break;
 			}
 		}
 
+		let errorMsg = '';
+		if (!ctx.request.body.firstname || !ctx.request.body.lastname) {
+			errorMsg = 'First name and Last name are required.';
+		} else if (!userInfo.login) {
+			errorMsg = 'Invalid username. It must start with a letter and contain only letters, numbers, or underscores.';
+		} else if (!userInfo.email) {
+			errorMsg = 'Invalid email address.';
+		} else if (!ctx.request.body.password || ctx.request.body.password.length < 6) {
+			errorMsg = 'Password must be at least 6 characters long.';
+		}
+
+		if (errorMsg) {
+			console.log("Validation error:", errorMsg);
+			await this.showForm(ctx, ctx.request.body, errorMsg);
+			return;
+		}
+
 		const confirmationCode = FormHelper.getRandomString();
 		userInfo['confirm'] = confirmationCode;
 
-		if (userInfo['email'] && userInfo['login'] && userInfo['firstname'] && userInfo['lastname'] && userInfo['password'].length > 5) {
-			console.log("adding user");
-			// hash the password before saving
-			const hashed = bcrypt.hashSync(userInfo['password'], 10);
-			await myuser.addUser({ login: userInfo['login'], email: userInfo['email'], firstname: userInfo['firstname'], lastname: userInfo['lastname'], password: hashed, confirm: userInfo['confirm'] },
-				async () => {
-					await this.showRegisterSuccess(ctx, ctx.request.body);
-					console.log("success in add");
-				},
-				async () => {
-					await this.showForm(ctx, ctx.request.body);
-				}
-			);
-		} else {
-			console.log("Failed validation");
-			await this.showForm(ctx, ctx.request.body);
-		}
+		console.log("adding user");
+		const hashed = bcrypt.hashSync(ctx.request.body.password, 10);
+		await myuser.addUser({
+			login: userInfo['login'],
+			email: userInfo['email'],
+			firstname: userInfo['firstname'],
+			lastname: userInfo['lastname'],
+			password: hashed,
+			confirm: userInfo['confirm']
+		},
+			async () => {
+				await this.showRegisterSuccess(ctx, ctx.request.body);
+				console.log("success in add");
+			},
+			async (err) => {
+				const isDuplicate = err && err.message && err.message.includes('UNIQUE');
+				const failMsg = isDuplicate
+					? 'A user with that username or email already exists.'
+					: 'Could not register user. Please try again.';
+				await this.showForm(ctx, ctx.request.body, failMsg);
+			}
+		);
 	}
 
 	async registerForm(ctx) {

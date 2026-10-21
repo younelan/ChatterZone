@@ -8,20 +8,17 @@ This is by no means complete but should give you an idea to get started with for
 
 ## Highlights:
 - uses native node:http (no web framework)
+- uses native node:sqlite (no database driver packages)
 - has basic themes
-- authenticates using sessions and mongoose
+- authenticates using sessions and sqlite
 - rudimentary theme engine (basic string replace)
-- Shows how to create a simple member zone, storing the users in mongo db. 
+- Shows how to create a simple member zone, storing the users in sqlite db. 
 - features a buggy falling blocks game that is available if you are logged in to demonstrate a member only page
-
-this demo used to use koa/express but simplified to just use a db layer/crypt
 
 ## To use:
 - make sure node.js is installed and in your executable path
-- make sure mongodb is installed and running (adjust credentials in user.js)
-- change to nodezone directory
-- make sure there is nothing running on port 3000 (or change port)
-- run "node app"
+- database file (community.db) and tables are auto-created on startup
+- run "node app.js" (or "npm start")
 
 ## Files:
 - **app.js** - main route and express setup

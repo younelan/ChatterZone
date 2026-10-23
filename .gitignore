@@ -6,6 +6,8 @@
 # Logs
 logs
 tmp
+data
+temp
 .agents
 .claude
 *.log

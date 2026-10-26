@@ -1,0 +1,118 @@
+<style>
+.people-wrapper {
+  margin-top: 10px;
+}
+.people-header {
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e2e8f0;
+}
+.people-header h2 {
+  margin: 0 0 5px 0;
+  color: #1e3a8a;
+}
+.people-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+.people-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+.member-card {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.member-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.12);
+  border-color: #3b82f6;
+}
+.member-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.member-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 18px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.member-names {
+  overflow: hidden;
+}
+.member-fullname {
+  font-weight: bold;
+  font-size: 16px;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.member-username {
+  font-size: 13px;
+  color: #3b82f6;
+}
+.member-bio {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.4;
+  margin-bottom: 12px;
+  flex-grow: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.member-action {
+  font-size: 13px;
+  font-weight: bold;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.member-card:hover .member-action {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+.empty-members {
+  padding: 30px;
+  text-align: center;
+  color: #64748b;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px dashed #cbd5e1;
+}
+</style>
+
+<div class="people-wrapper">
+  <div class="people-header">
+    <h2>Community Directory</h2>
+    <p>Browse through registered community members and view their profiles.</p>
+  </div>
+
+  <div class="people-grid">
+    {user_cards}
+  </div>
+</div>

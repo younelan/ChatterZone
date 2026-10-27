@@ -14,6 +14,23 @@ const siteConfigPath = path.join(__dirname, 'config', 'siteConfig.json');
 const siteConfigRaw = fs.readFileSync(siteConfigPath);
 const SiteConfig = JSON.parse(siteConfigRaw);
 
+function escapeHtml(str) {
+	if (!str) return '';
+	return String(str)
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#039;');
+}
+
+function getInitials(firstname, lastname, login) {
+	const f = (firstname || '').trim()[0] || '';
+	const l = (lastname || '').trim()[0] || '';
+	const initials = (f + l).toUpperCase();
+	return initials || (login || 'U')[0].toUpperCase();
+}
+
 class Routes {
 	constructor() {
 		// Initialize any necessary properties or instances here
@@ -184,16 +201,181 @@ class Routes {
 
 	async listUsers(ctx) {
 		try {
-			let content = "";
 			const users = await myuser.listUsers();
-			users.forEach(user => {
-				content += `<li>${user.firstname} ${user.lastname}</li>\n`;
+			let userCards = '';
+
+			if (!users || users.length === 0) {
+				userCards = '<div class="empty-members">No registered community members yet.</div>';
+			} else {
+				users.forEach(user => {
+					const initials = getInitials(user.firstname, user.lastname, user.login);
+					const safeFirst = escapeHtml(user.firstname);
+					const safeLast = escapeHtml(user.lastname);
+					const safeLogin = escapeHtml(user.login);
+					const safeBio = user.bio ? escapeHtml(user.bio) : 'Community member';
+
+					userCards += `
+						<a href="/profile/${encodeURIComponent(user.login)}" class="member-card">
+							<div class="member-top">
+								<div class="member-avatar">${initials}</div>
+								<div class="member-names">
+									<div class="member-fullname">${safeFirst} ${safeLast}</div>
+									<div class="member-username">@${safeLogin}</div>
+								</div>
+							</div>
+							<div class="member-bio">${safeBio}</div>
+							<div class="member-action">View Profile &rarr;</div>
+						</a>
+					`;
+				});
+			}
+
+			const content = templateHelper.render('views/people.html', {
+				user_cards: userCards
 			});
 
 			await this.showPage(ctx, { content });
 		} catch (error) {
 			console.error("Error occurred in listUsers route:", error);
-			// Handle error
+		}
+	}
+
+	async showProfile(ctx, username) {
+		try {
+			const targetUsername = username || (ctx.session.user && ctx.session.user.login);
+
+			if (!targetUsername) {
+				ctx.redirect('/login');
+				return;
+			}
+
+			const user = await myuser.findUser({ login: targetUsername });
+
+			if (!user) {
+				const content = `
+					<div style="padding: 30px; text-align: center; background: #fff; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 10px;">
+						<h2 style="color: #1e3a8a; margin-top: 0;">Member Not Found</h2>
+						<p style="color: #64748b;">The user "@${escapeHtml(targetUsername)}" does not exist in our community directory.</p>
+						<a href="/people" style="color: #2563eb; font-weight: bold; text-decoration: none;">&larr; Back to Member Directory</a>
+					</div>
+				`;
+				await this.showPage(ctx, { content });
+				return;
+			}
+
+			const isOwner = ctx.session.user && (ctx.session.user.login === user.login || ctx.session.user.id === user.id);
+			const editButton = isOwner
+				? `<a href="/profile/${encodeURIComponent(user.login)}/edit" class="btn-edit">✏️ Edit My Profile</a>`
+				: '';
+
+			const url = new URL(ctx.req.url, `http://${ctx.req.headers.host || 'localhost'}`);
+			const notice = url.searchParams.get('updated') === '1'
+				? '<div class="notice-box">✓ Your profile has been updated successfully!</div>'
+				: '';
+
+			const content = templateHelper.render('views/profile.html', {
+				avatar_initials: getInitials(user.firstname, user.lastname, user.login),
+				firstname: escapeHtml(user.firstname),
+				lastname: escapeHtml(user.lastname),
+				login: escapeHtml(user.login),
+				email: escapeHtml(user.email),
+				bio: user.bio ? escapeHtml(user.bio) : '<em>No bio provided yet.</em>',
+				edit_button: editButton,
+				notice: notice
+			});
+
+			await this.showPage(ctx, { content });
+		} catch (error) {
+			console.error("Error occurred in showProfile route:", error);
+		}
+	}
+
+	async showEditProfile(ctx, username, errorMessage = '', formData = null) {
+		try {
+			if (!ctx.session.user) {
+				ctx.redirect('/login');
+				return;
+			}
+
+			if (ctx.session.user.login !== username) {
+				ctx.redirect(`/profile/${encodeURIComponent(ctx.session.user.login)}`);
+				return;
+			}
+
+			const user = await myuser.findUser({ id: ctx.session.user.id });
+			if (!user) {
+				ctx.redirect('/login');
+				return;
+			}
+
+			const data = formData || user;
+			const errorHtml = errorMessage
+				? `<div class="edit-error">${escapeHtml(errorMessage)}</div>`
+				: '';
+
+			const content = templateHelper.render('views/profile_edit.html', {
+				login: escapeHtml(user.login),
+				firstname: escapeHtml(data.firstname || ''),
+				lastname: escapeHtml(data.lastname || ''),
+				email: escapeHtml(data.email || ''),
+				bio: escapeHtml(data.bio || ''),
+				error: errorHtml
+			});
+
+			await this.showPage(ctx, { content });
+		} catch (error) {
+			console.error("Error occurred in showEditProfile route:", error);
+		}
+	}
+
+	async updateProfile(ctx, username) {
+		try {
+			if (!ctx.session.user) {
+				ctx.redirect('/login');
+				return;
+			}
+
+			if (ctx.session.user.login !== username) {
+				ctx.redirect(`/profile/${encodeURIComponent(ctx.session.user.login)}`);
+				return;
+			}
+
+			const { firstname, lastname, email, bio } = ctx.request.body;
+			const cleanFirst = (firstname || '').trim();
+			const cleanLast = (lastname || '').trim();
+			const cleanEmail = (email || '').trim();
+			const cleanBio = (bio || '').trim();
+
+			if (!cleanFirst || !cleanLast) {
+				await this.showEditProfile(ctx, username, 'First name and Last name are required.', ctx.request.body);
+				return;
+			}
+
+			if (!FormHelper.isEmail(cleanEmail)) {
+				await this.showEditProfile(ctx, username, 'Please provide a valid email address.', ctx.request.body);
+				return;
+			}
+
+			// Check if email is already taken by another member
+			const existing = await myuser.findUser({ email: cleanEmail });
+			if (existing && existing.id !== ctx.session.user.id) {
+				await this.showEditProfile(ctx, username, 'That email address is already in use by another member.', ctx.request.body);
+				return;
+			}
+
+			const updated = await myuser.updateUser(ctx.session.user.id, {
+				firstname: cleanFirst,
+				lastname: cleanLast,
+				email: cleanEmail,
+				bio: cleanBio
+			});
+
+			// Update session with fresh details
+			ctx.session.user = updated;
+			ctx.redirect(`/profile/${encodeURIComponent(username)}?updated=1`);
+		} catch (error) {
+			console.error("Error occurred in updateProfile route:", error);
+			await this.showEditProfile(ctx, username, 'Could not save profile changes. Please try again.', ctx.request.body);
 		}
 	}
 

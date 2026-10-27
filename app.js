@@ -171,9 +171,28 @@ const server = http.createServer(async (req, res) => {
     else if (pathname === '/logoff' && isGetOrHead) {
       await routes.logoffUser(ctx);
     }
-    // 9. People / Profile
-    else if ((pathname === '/people' || pathname === '/profile') && isGetOrHead) {
+    // 9. Community Members Directory
+    else if (pathname === '/people' && isGetOrHead) {
       await routes.listUsers(ctx);
+    }
+    // 10. Self Profile
+    else if (pathname === '/profile' && isGetOrHead) {
+      await routes.showProfile(ctx, null);
+    }
+    // 11. Profile Edit Form (GET)
+    else if (pathname.match(/^\/profile\/([^\/]+)\/edit$/) && isGetOrHead) {
+      const match = pathname.match(/^\/profile\/([^\/]+)\/edit$/);
+      await routes.showEditProfile(ctx, decodeURIComponent(match[1]));
+    }
+    // 12. Profile Edit Save (POST)
+    else if (pathname.match(/^\/profile\/([^\/]+)\/edit$/) && method === 'POST') {
+      const match = pathname.match(/^\/profile\/([^\/]+)\/edit$/);
+      await routes.updateProfile(ctx, decodeURIComponent(match[1]));
+    }
+    // 13. Specific Member Profile (GET)
+    else if (pathname.match(/^\/profile\/([^\/]+)$/) && isGetOrHead) {
+      const match = pathname.match(/^\/profile\/([^\/]+)$/);
+      await routes.showProfile(ctx, decodeURIComponent(match[1]));
     }
     // 10. Fallback 404
     else {

@@ -16,7 +16,8 @@ db.exec(`
     firstname TEXT NOT NULL,
     lastname TEXT NOT NULL,
     password TEXT NOT NULL,
-    confirm TEXT
+    confirm TEXT,
+    bio TEXT DEFAULT ''
   );
 `);
 
@@ -79,6 +80,30 @@ class SqliteUser {
     } catch (error) {
       console.error('Error listing users:', error);
       return [];
+    }
+  }
+
+  async updateUser(id, updateData) {
+    try {
+      const stmt = db.prepare(`
+        UPDATE users
+        SET firstname = @firstname,
+            lastname = @lastname,
+            email = @email,
+            bio = @bio
+        WHERE id = @id
+      `);
+      stmt.run({
+        id,
+        firstname: updateData.firstname,
+        lastname: updateData.lastname,
+        email: updateData.email,
+        bio: updateData.bio || ''
+      });
+      return await this.findUser({ id });
+    } catch (error) {
+      console.error('Error updating user:', error);
+      throw error;
     }
   }
 }

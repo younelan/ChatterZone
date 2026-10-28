@@ -264,9 +264,14 @@ class Routes {
 			}
 
 			const isOwner = ctx.session.user && (ctx.session.user.login === user.login || ctx.session.user.id === user.id);
-			const editButton = isOwner
-				? `<a href="/profile/${encodeURIComponent(user.login)}/edit" class="btn-edit">✏️ Edit My Profile</a>`
-				: '';
+			let editButton = '';
+			if (isOwner) {
+				editButton = `<a href="/profile/${encodeURIComponent(user.login)}/edit" class="btn-edit">✏️ Edit My Profile</a>`;
+			} else if (ctx.session.user) {
+				editButton = `<a href="/messages/${encodeURIComponent(user.login)}" class="btn-message">💬 Message</a>`;
+			} else {
+				editButton = `<a href="/login" class="btn-message">💬 Login to Message</a>`;
+			}
 
 			const url = new URL(ctx.req.url, `http://${ctx.req.headers.host || 'localhost'}`);
 			const notice = url.searchParams.get('updated') === '1'
@@ -376,6 +381,181 @@ class Routes {
 		} catch (error) {
 			console.error("Error occurred in updateProfile route:", error);
 			await this.showEditProfile(ctx, username, 'Could not save profile changes. Please try again.', ctx.request.body);
+		}
+	}
+
+	// --- Discussion / Messaging Methods ---
+
+	async showDiscussions(ctx, targetUsername = null) {
+		try {
+			if (!ctx.session.user) {
+				ctx.redirect('/login');
+				return;
+			}
+
+			const currentUserId = ctx.session.user.id;
+			let conversations = await myuser.getConversations(currentUserId);
+
+			// Determine which contact is actively selected
+			let activeContact = null;
+			if (targetUsername) {
+				activeContact = await myuser.findUser({ login: targetUsername });
+			}
+
+			// If no target specified but conversations exist, default to the most recent conversation
+			if (!activeContact && conversations.length > 0) {
+				activeContact = await myuser.findUser({ id: conversations[0].contact_id });
+			}
+
+			// Prevent chatting with yourself
+			if (activeContact && activeContact.id === currentUserId) {
+				activeContact = null;
+			}
+
+			// If chatting with someone who isn't yet in the conversations list, prepend them
+			let convList = [...conversations];
+			if (activeContact && !convList.some(c => c.contact_id === activeContact.id)) {
+				convList.unshift({
+					contact_id: activeContact.id,
+					contact_login: activeContact.login,
+					contact_firstname: activeContact.firstname,
+					contact_lastname: activeContact.lastname,
+					last_message: 'Start a new conversation...',
+					last_message_time: new Date().toISOString(),
+					last_sender_id: null,
+					unread_count: 0
+				});
+			}
+
+			// 1. Build Left Column: Conversation Items
+			let convItemsHtml = '';
+			if (convList.length === 0) {
+				convItemsHtml = '<div class="no-conv-box">No conversations yet.<br><a href="/people" style="color:#2563eb;font-weight:bold;margin-top:6px;display:inline-block;">Start a chat</a></div>';
+			} else {
+				convList.forEach(conv => {
+					const isActive = activeContact && activeContact.id === conv.contact_id;
+					const initials = getInitials(conv.contact_firstname, conv.contact_lastname, conv.contact_login);
+					const hasUnread = conv.unread_count > 0;
+					const unreadBadge = hasUnread ? `<span class="conv-unread-badge">${conv.unread_count}</span>` : '';
+					const timeStr = conv.last_message_time
+						? new Date(conv.last_message_time).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+						: '';
+
+					convItemsHtml += `
+						<a href="/messages/${encodeURIComponent(conv.contact_login)}" class="chat-conv-item ${isActive ? 'active' : ''} ${hasUnread ? 'unread' : ''}">
+							<div class="conv-avatar">${initials}</div>
+							<div class="conv-details">
+								<div class="conv-name">${escapeHtml(conv.contact_firstname)} ${escapeHtml(conv.contact_lastname)}</div>
+								<div class="conv-snippet">${escapeHtml(conv.last_message || '')}</div>
+								<div class="conv-meta">
+									<span class="conv-time">${timeStr}</span>
+									${unreadBadge}
+								</div>
+							</div>
+						</a>
+					`;
+				});
+			}
+
+			// 2. Build Right Column: Active Chat Stream & Input Form
+			let activeChatHtml = '';
+			if (activeContact) {
+				const thread = await myuser.getThread(currentUserId, activeContact.id);
+				const contactInitials = getInitials(activeContact.firstname, activeContact.lastname, activeContact.login);
+
+				let bubblesHtml = '';
+				if (thread.length === 0) {
+					bubblesHtml = `<div class="empty-thread">No messages yet. Say hello to ${escapeHtml(activeContact.firstname)}! 👋</div>`;
+				} else {
+					thread.forEach(msg => {
+						const isOutgoing = msg.sender_id === currentUserId;
+						const timeStr = new Date(msg.created_at).toLocaleTimeString(undefined, {
+							hour: '2-digit',
+							minute: '2-digit'
+						});
+
+						bubblesHtml += `
+							<div class="chat-bubble-row ${isOutgoing ? 'outgoing' : 'incoming'}">
+								<div class="chat-bubble">${escapeHtml(msg.body)}</div>
+								<div class="chat-bubble-time">${timeStr}</div>
+							</div>
+						`;
+					});
+				}
+
+				activeChatHtml = `
+					<div class="chat-main-header">
+						<div class="chat-header-user">
+							<div class="chat-header-avatar">${contactInitials}</div>
+							<div class="chat-header-info">
+								<h4>${escapeHtml(activeContact.firstname)} ${escapeHtml(activeContact.lastname)}</h4>
+								<a href="/profile/${encodeURIComponent(activeContact.login)}">@${escapeHtml(activeContact.login)} &bull; View Profile</a>
+							</div>
+						</div>
+					</div>
+
+					<div class="chat-stream" id="chat-stream">
+						${bubblesHtml}
+					</div>
+
+					<div class="chat-footer">
+						<form method="POST" action="/messages/${encodeURIComponent(activeContact.login)}" class="chat-input-form">
+							<input type="text" id="chat-input" name="body" class="chat-input-box" placeholder="Type a message to ${escapeHtml(activeContact.firstname)}..." autocomplete="off" required />
+							<button type="submit" class="btn-chat-send">Send ✈</button>
+						</form>
+					</div>
+				`;
+			} else {
+				activeChatHtml = `
+					<div class="chat-empty-state">
+						<div class="chat-empty-icon">💬</div>
+						<h3>Your Discussions</h3>
+						<p>Select a discussion on the left, or message a member from the directory.</p>
+						<a href="/people" class="btn-browse-people">Browse Community Members</a>
+					</div>
+				`;
+			}
+
+			const content = templateHelper.render('views/discussions.html', {
+				conversation_items: convItemsHtml,
+				active_chat_content: activeChatHtml
+			});
+
+			await this.showPage(ctx, { content });
+		} catch (error) {
+			console.error("Error occurred in showDiscussions route:", error);
+		}
+	}
+
+	async handleSendChatMessage(ctx, targetUsername) {
+		try {
+			if (!ctx.session.user) {
+				ctx.redirect('/login');
+				return;
+			}
+
+			const bodyText = (ctx.request.body.body || '').trim();
+			if (!bodyText) {
+				ctx.redirect(`/messages/${encodeURIComponent(targetUsername)}`);
+				return;
+			}
+
+			const recipient = await myuser.findUser({ login: targetUsername });
+			if (!recipient || recipient.id === ctx.session.user.id) {
+				ctx.redirect('/messages');
+				return;
+			}
+
+			await myuser.sendMessage({
+				sender_id: ctx.session.user.id,
+				recipient_id: recipient.id,
+				body: bodyText
+			});
+
+			ctx.redirect(`/messages/${encodeURIComponent(targetUsername)}`);
+		} catch (error) {
+			console.error("Error occurred in handleSendChatMessage route:", error);
+			ctx.redirect('/messages');
 		}
 	}
 

@@ -153,8 +153,8 @@ const server = http.createServer(async (req, res) => {
       ctx.params = { theme };
       await routes.setTheme(ctx);
     }
-    // 5. Home
-    else if (pathname === '/' && isGetOrHead) {
+    // 5. Home or Login
+    else if ((pathname === '/' || pathname === '/login') && isGetOrHead) {
       await routes.index(ctx);
     }
     // 6. Register form & handler
@@ -193,6 +193,20 @@ const server = http.createServer(async (req, res) => {
     else if (pathname.match(/^\/profile\/([^\/]+)$/) && isGetOrHead) {
       const match = pathname.match(/^\/profile\/([^\/]+)$/);
       await routes.showProfile(ctx, decodeURIComponent(match[1]));
+    }
+    // 14. Discussions Dashboard (GET)
+    else if (pathname === '/messages' && isGetOrHead) {
+      await routes.showDiscussions(ctx, null);
+    }
+    // 15. Direct Discussion Thread with User (GET)
+    else if (pathname.match(/^\/messages\/([^\/]+)$/) && isGetOrHead) {
+      const match = pathname.match(/^\/messages\/([^\/]+)$/);
+      await routes.showDiscussions(ctx, decodeURIComponent(match[1]));
+    }
+    // 16. Send Message into Thread (POST)
+    else if (pathname.match(/^\/messages\/([^\/]+)$/) && method === 'POST') {
+      const match = pathname.match(/^\/messages\/([^\/]+)$/);
+      await routes.handleSendChatMessage(ctx, decodeURIComponent(match[1]));
     }
     // 10. Fallback 404
     else {

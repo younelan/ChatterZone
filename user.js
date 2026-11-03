@@ -31,6 +31,15 @@ db.exec(`
     FOREIGN KEY (sender_id) REFERENCES users(id),
     FOREIGN KEY (recipient_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS follows (
+    follower_id INTEGER NOT NULL,
+    following_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (follower_id, following_id),
+    FOREIGN KEY (follower_id) REFERENCES users(id),
+    FOREIGN KEY (following_id) REFERENCES users(id)
+  );
 `);
 
 console.log('Connected to SQLite database at', dbPath);
@@ -221,6 +230,109 @@ class SqliteUser {
     } catch (error) {
       console.error('Error getting unread count:', error);
       return 0;
+    }
+  }
+
+  // --- Follow / Social Methods ---
+
+  async follow(followerId, followingId) {
+    if (followerId === followingId) return false;
+    try {
+      const stmt = db.prepare(`
+        INSERT OR IGNORE INTO follows (follower_id, following_id)
+        VALUES (?, ?)
+      `);
+      stmt.run(followerId, followingId);
+      return true;
+    } catch (error) {
+      console.error('Error following user:', error);
+      return false;
+    }
+  }
+
+  async unfollow(followerId, followingId) {
+    try {
+      const stmt = db.prepare(`
+        DELETE FROM follows
+        WHERE follower_id = ? AND following_id = ?
+      `);
+      stmt.run(followerId, followingId);
+      return true;
+    } catch (error) {
+      console.error('Error unfollowing user:', error);
+      return false;
+    }
+  }
+
+  async isFollowing(followerId, followingId) {
+    if (!followerId || !followingId) return false;
+    try {
+      const stmt = db.prepare(`
+        SELECT 1 FROM follows
+        WHERE follower_id = ? AND following_id = ?
+      `);
+      return !!stmt.get(followerId, followingId);
+    } catch (error) {
+      console.error('Error checking follow status:', error);
+      return false;
+    }
+  }
+
+  async getFollowCounts(userId) {
+    try {
+      const followersRow = db.prepare(`SELECT COUNT(*) as cnt FROM follows WHERE following_id = ?`).get(userId);
+      const followingRow = db.prepare(`SELECT COUNT(*) as cnt FROM follows WHERE follower_id = ?`).get(userId);
+      return {
+        followers: followersRow ? followersRow.cnt : 0,
+        following: followingRow ? followingRow.cnt : 0
+      };
+    } catch (error) {
+      console.error('Error getting follow counts:', error);
+      return { followers: 0, following: 0 };
+    }
+  }
+
+  async getFollowers(userId) {
+    try {
+      const stmt = db.prepare(`
+        SELECT u.id, u.login, u.firstname, u.lastname, u.email, u.bio
+        FROM follows f
+        JOIN users u ON f.follower_id = u.id
+        WHERE f.following_id = ?
+        ORDER BY f.created_at DESC
+      `);
+      return stmt.all(userId);
+    } catch (error) {
+      console.error('Error getting followers:', error);
+      return [];
+    }
+  }
+
+  async getFollowing(userId) {
+    try {
+      const stmt = db.prepare(`
+        SELECT u.id, u.login, u.firstname, u.lastname, u.email, u.bio
+        FROM follows f
+        JOIN users u ON f.following_id = u.id
+        WHERE f.follower_id = ?
+        ORDER BY f.created_at DESC
+      `);
+      return stmt.all(userId);
+    } catch (error) {
+      console.error('Error getting following:', error);
+      return [];
+    }
+  }
+
+  async getFollowingIds(userId) {
+    if (!userId) return new Set();
+    try {
+      const stmt = db.prepare(`SELECT following_id FROM follows WHERE follower_id = ?`);
+      const rows = stmt.all(userId);
+      return new Set(rows.map(r => r.following_id));
+    } catch (error) {
+      console.error('Error getting following IDs:', error);
+      return new Set();
     }
   }
 }

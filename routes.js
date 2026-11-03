@@ -264,13 +264,36 @@ class Routes {
 			}
 
 			const isOwner = ctx.session.user && (ctx.session.user.login === user.login || ctx.session.user.id === user.id);
+			const followCounts = await myuser.getFollowCounts(user.id);
+			const isFollowing = !isOwner && ctx.session.user ? await myuser.isFollowing(ctx.session.user.id, user.id) : false;
+
 			let editButton = '';
+			let followButton = '';
+			let messageButton = '';
+
 			if (isOwner) {
 				editButton = `<a href="/profile/${encodeURIComponent(user.login)}/edit" class="btn-edit">✏️ Edit My Profile</a>`;
 			} else if (ctx.session.user) {
-				editButton = `<a href="/messages/${encodeURIComponent(user.login)}" class="btn-message">💬 Message</a>`;
+				messageButton = `<a href="/messages/${encodeURIComponent(user.login)}" class="btn-message">💬 Message</a>`;
+				if (isFollowing) {
+					followButton = `
+						<form method="POST" action="/profile/${encodeURIComponent(user.login)}/unfollow" style="display:inline">
+							<button type="submit" class="btn-unfollow" title="Click to Unfollow">
+								<span class="text-following">✓ Following</span>
+								<span class="text-unfollow">Unfollow</span>
+							</button>
+						</form>
+					`;
+				} else {
+					followButton = `
+						<form method="POST" action="/profile/${encodeURIComponent(user.login)}/follow" style="display:inline">
+							<button type="submit" class="btn-follow">+ Follow</button>
+						</form>
+					`;
+				}
 			} else {
-				editButton = `<a href="/login" class="btn-message">💬 Login to Message</a>`;
+				followButton = `<a href="/login" class="btn-follow">+ Follow</a>`;
+				messageButton = `<a href="/login" class="btn-message">💬 Message</a>`;
 			}
 
 			const url = new URL(ctx.req.url, `http://${ctx.req.headers.host || 'localhost'}`);
@@ -285,7 +308,11 @@ class Routes {
 				login: escapeHtml(user.login),
 				email: escapeHtml(user.email),
 				bio: user.bio ? escapeHtml(user.bio) : '<em>No bio provided yet.</em>',
+				follow_button: followButton,
+				message_button: messageButton,
 				edit_button: editButton,
+				following_count: followCounts.following,
+				followers_count: followCounts.followers,
 				notice: notice
 			});
 
@@ -381,6 +408,184 @@ class Routes {
 		} catch (error) {
 			console.error("Error occurred in updateProfile route:", error);
 			await this.showEditProfile(ctx, username, 'Could not save profile changes. Please try again.', ctx.request.body);
+		}
+	}
+
+	// --- Follow / Social Connection Methods ---
+
+	async followUser(ctx, targetUsername) {
+		try {
+			if (!ctx.session.user) {
+				ctx.redirect('/login');
+				return;
+			}
+
+			const targetUser = await myuser.findUser({ login: targetUsername });
+			if (targetUser && targetUser.id !== ctx.session.user.id) {
+				await myuser.follow(ctx.session.user.id, targetUser.id);
+			}
+
+			let returnTo = ctx.request.body && ctx.request.body.returnTo;
+			if (!returnTo && ctx.req.headers.referer) {
+				try {
+					const refUrl = new URL(ctx.req.headers.referer);
+					returnTo = refUrl.pathname + refUrl.search;
+				} catch (e) {
+					returnTo = null;
+				}
+			}
+			if (!returnTo) {
+				returnTo = `/profile/${encodeURIComponent(targetUsername)}`;
+			}
+			ctx.redirect(returnTo);
+		} catch (error) {
+			console.error("Error occurred in followUser route:", error);
+			ctx.redirect(`/profile/${encodeURIComponent(targetUsername)}`);
+		}
+	}
+
+	async unfollowUser(ctx, targetUsername) {
+		try {
+			if (!ctx.session.user) {
+				ctx.redirect('/login');
+				return;
+			}
+
+			const targetUser = await myuser.findUser({ login: targetUsername });
+			if (targetUser) {
+				await myuser.unfollow(ctx.session.user.id, targetUser.id);
+			}
+
+			let returnTo = ctx.request.body && ctx.request.body.returnTo;
+			if (!returnTo && ctx.req.headers.referer) {
+				try {
+					const refUrl = new URL(ctx.req.headers.referer);
+					returnTo = refUrl.pathname + refUrl.search;
+				} catch (e) {
+					returnTo = null;
+				}
+			}
+			if (!returnTo) {
+				returnTo = `/profile/${encodeURIComponent(targetUsername)}`;
+			}
+			ctx.redirect(returnTo);
+		} catch (error) {
+			console.error("Error occurred in unfollowUser route:", error);
+			ctx.redirect(`/profile/${encodeURIComponent(targetUsername)}`);
+		}
+	}
+
+	async showConnections(ctx, targetUsername, activeTab = 'following') {
+		try {
+			const targetLogin = targetUsername || (ctx.session.user && ctx.session.user.login);
+
+			if (!targetLogin) {
+				ctx.redirect('/login');
+				return;
+			}
+
+			const user = await myuser.findUser({ login: targetLogin });
+			if (!user) {
+				const content = `
+					<div style="padding: 30px; text-align: center; background: #fff; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 10px;">
+						<h2 style="color: #1e3a8a; margin-top: 0;">Member Not Found</h2>
+						<p style="color: #64748b;">The user "@${escapeHtml(targetLogin)}" does not exist in our community directory.</p>
+						<a href="/people" style="color: #2563eb; font-weight: bold; text-decoration: none;">&larr; Back to Member Directory</a>
+					</div>
+				`;
+				await this.showPage(ctx, { content });
+				return;
+			}
+
+			const isOwner = ctx.session.user && (ctx.session.user.login === user.login || ctx.session.user.id === user.id);
+			const currentUserId = ctx.session.user ? ctx.session.user.id : null;
+			const followCounts = await myuser.getFollowCounts(user.id);
+			const myFollowingSet = currentUserId ? await myuser.getFollowingIds(currentUserId) : new Set();
+
+			const isFollowingTab = activeTab !== 'followers';
+			const list = isFollowingTab ? await myuser.getFollowing(user.id) : await myuser.getFollowers(user.id);
+
+			let connectionsHtml = '';
+			if (!list || list.length === 0) {
+				const emptyMsg = isFollowingTab
+					? (isOwner ? 'You are not following anyone yet.<br><a href="/people" style="color:#2563eb;font-weight:bold;margin-top:8px;display:inline-block;">Browse community members &rarr;</a>' : `@${escapeHtml(user.login)} is not following anyone yet.`)
+					: (isOwner ? 'No one is following you yet.' : `No one is following @${escapeHtml(user.login)} yet.`);
+				connectionsHtml = `<div class="empty-connections">${emptyMsg}</div>`;
+			} else {
+				const currentUrl = ctx.req.url;
+				list.forEach(person => {
+					const initials = getInitials(person.firstname, person.lastname, person.login);
+					const safeFirst = escapeHtml(person.firstname);
+					const safeLast = escapeHtml(person.lastname);
+					const safeLogin = escapeHtml(person.login);
+					const safeBio = person.bio ? escapeHtml(person.bio) : '';
+					const isSelf = currentUserId && currentUserId === person.id;
+					const isFollowedByMe = myFollowingSet.has(person.id);
+
+					let actionButtons = `<a href="/profile/${encodeURIComponent(person.login)}" class="btn-conn-view">Profile</a>`;
+
+					if (currentUserId && !isSelf) {
+						actionButtons += `<a href="/messages/${encodeURIComponent(person.login)}" class="btn-conn-msg">💬 Message</a>`;
+						if (isFollowedByMe) {
+							actionButtons += `
+								<form method="POST" action="/profile/${encodeURIComponent(person.login)}/unfollow" style="display:inline;margin:0;">
+									<input type="hidden" name="returnTo" value="${escapeHtml(currentUrl)}">
+									<button type="submit" class="btn-conn-unfollow" title="Click to Unfollow">
+										<span class="text-following">✓ Following</span>
+										<span class="text-unfollow">Unfollow</span>
+									</button>
+								</form>
+							`;
+						} else {
+							actionButtons += `
+								<form method="POST" action="/profile/${encodeURIComponent(person.login)}/follow" style="display:inline;margin:0;">
+									<input type="hidden" name="returnTo" value="${escapeHtml(currentUrl)}">
+									<button type="submit" class="btn-conn-follow">+ Follow</button>
+								</form>
+							`;
+						}
+					} else if (!currentUserId) {
+						actionButtons += `
+							<a href="/login" class="btn-conn-msg">💬 Message</a>
+							<a href="/login" class="btn-conn-follow">+ Follow</a>
+						`;
+					}
+
+					connectionsHtml += `
+						<div class="connection-item">
+							<a href="/profile/${encodeURIComponent(person.login)}" class="conn-user-info">
+								<div class="conn-avatar">${initials}</div>
+								<div class="conn-name-block">
+									<div class="conn-fullname">${safeFirst} ${safeLast}</div>
+									<div class="conn-username">@${safeLogin}</div>
+									${safeBio ? `<div class="conn-bio-snippet">${safeBio}</div>` : ''}
+								</div>
+							</a>
+							<div class="conn-actions">
+								${actionButtons}
+							</div>
+						</div>
+					`;
+				});
+			}
+
+			const backUrl = isOwner ? '/profile' : `/profile/${encodeURIComponent(user.login)}`;
+			const backText = isOwner ? 'Back to My Profile' : `Back to @${escapeHtml(user.login)}'s Profile`;
+
+			const content = templateHelper.render('views/connections.html', {
+				profile_login: escapeHtml(user.login),
+				back_url: backUrl,
+				back_text: backText,
+				following_count: followCounts.following,
+				followers_count: followCounts.followers,
+				following_active: isFollowingTab ? 'active' : '',
+				followers_active: !isFollowingTab ? 'active' : '',
+				connections_list: connectionsHtml
+			});
+
+			await this.showPage(ctx, { content });
+		} catch (error) {
+			console.error("Error occurred in showConnections route:", error);
 		}
 	}
 

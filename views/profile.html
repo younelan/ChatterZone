@@ -76,6 +76,74 @@
   background-color: #059669;
   color: #ffffff;
 }
+.btn-follow {
+  display: inline-block;
+  background-color: #0284c7;
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(2,132,199,0.2);
+  transition: background-color 0.15s ease;
+}
+.btn-follow:hover {
+  background-color: #0369a1;
+}
+.btn-unfollow {
+  display: inline-block;
+  background-color: #f8fafc;
+  color: #475569;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-unfollow .text-following {
+  display: inline;
+}
+.btn-unfollow .text-unfollow {
+  display: none;
+}
+.btn-unfollow:hover {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+.btn-unfollow:hover .text-following {
+  display: none;
+}
+.btn-unfollow:hover .text-unfollow {
+  display: inline;
+}
+.profile-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 14px;
+}
+.stat-link {
+  color: #475569;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.stat-link:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+.stat-link strong {
+  color: #0f172a;
+  font-size: 15px;
+}
+.stat-dot {
+  color: #94a3b8;
+}
 .btn-back {
   display: inline-block;
   background-color: #f1f5f9;
@@ -153,6 +221,8 @@
         {avatar_initials}
       </div>
       <div class="profile-actions">
+        {follow_button}
+        {message_button}
         {edit_button}
         <a href="/people" class="btn-back">&larr; Members</a>
       </div>
@@ -163,6 +233,15 @@
     <div class="profile-name-section">
       <h2>{firstname} {lastname}</h2>
       <div class="profile-handle">@{login}</div>
+      <div class="profile-stats">
+        <a href="/profile/{login}/following" class="stat-link">
+          <strong>{following_count}</strong> Following
+        </a>
+        <span class="stat-dot">&bull;</span>
+        <a href="/profile/{login}/followers" class="stat-link">
+          <strong>{followers_count}</strong> Followers
+        </a>
+      </div>
     </div>
 
     <div class="profile-bio-box">

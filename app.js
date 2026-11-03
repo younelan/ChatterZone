@@ -175,21 +175,48 @@ const server = http.createServer(async (req, res) => {
     else if (pathname === '/people' && isGetOrHead) {
       await routes.listUsers(ctx);
     }
-    // 10. Self Profile
+    // 10. Social Network: Following & Followers (Menu shortcuts)
+    else if ((pathname === '/following' || pathname === '/connections') && isGetOrHead) {
+      await routes.showConnections(ctx, null, 'following');
+    }
+    else if (pathname === '/followers' && isGetOrHead) {
+      await routes.showConnections(ctx, null, 'followers');
+    }
+    // 11. Self Profile
     else if (pathname === '/profile' && isGetOrHead) {
       await routes.showProfile(ctx, null);
     }
-    // 11. Profile Edit Form (GET)
+    // 12. Profile Edit Form (GET)
     else if (pathname.match(/^\/profile\/([^\/]+)\/edit$/) && isGetOrHead) {
       const match = pathname.match(/^\/profile\/([^\/]+)\/edit$/);
       await routes.showEditProfile(ctx, decodeURIComponent(match[1]));
     }
-    // 12. Profile Edit Save (POST)
+    // 13. Profile Edit Save (POST)
     else if (pathname.match(/^\/profile\/([^\/]+)\/edit$/) && method === 'POST') {
       const match = pathname.match(/^\/profile\/([^\/]+)\/edit$/);
       await routes.updateProfile(ctx, decodeURIComponent(match[1]));
     }
-    // 13. Specific Member Profile (GET)
+    // 14. Follow Member (POST)
+    else if (pathname.match(/^\/profile\/([^\/]+)\/follow$/) && method === 'POST') {
+      const match = pathname.match(/^\/profile\/([^\/]+)\/follow$/);
+      await routes.followUser(ctx, decodeURIComponent(match[1]));
+    }
+    // 15. Unfollow Member (POST)
+    else if (pathname.match(/^\/profile\/([^\/]+)\/unfollow$/) && method === 'POST') {
+      const match = pathname.match(/^\/profile\/([^\/]+)\/unfollow$/);
+      await routes.unfollowUser(ctx, decodeURIComponent(match[1]));
+    }
+    // 16. Member's Following List (GET)
+    else if (pathname.match(/^\/profile\/([^\/]+)\/following$/) && isGetOrHead) {
+      const match = pathname.match(/^\/profile\/([^\/]+)\/following$/);
+      await routes.showConnections(ctx, decodeURIComponent(match[1]), 'following');
+    }
+    // 17. Member's Followers List (GET)
+    else if (pathname.match(/^\/profile\/([^\/]+)\/followers$/) && isGetOrHead) {
+      const match = pathname.match(/^\/profile\/([^\/]+)\/followers$/);
+      await routes.showConnections(ctx, decodeURIComponent(match[1]), 'followers');
+    }
+    // 18. Specific Member Profile (GET)
     else if (pathname.match(/^\/profile\/([^\/]+)$/) && isGetOrHead) {
       const match = pathname.match(/^\/profile\/([^\/]+)$/);
       await routes.showProfile(ctx, decodeURIComponent(match[1]));

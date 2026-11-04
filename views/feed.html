@@ -1,0 +1,275 @@
+<style>
+.feed-wrapper {
+  max-width: 650px;
+  margin: 10px auto 30px auto;
+}
+.feed-top-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #475569;
+}
+.feed-top-banner a {
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+}
+.feed-top-banner a:hover {
+  text-decoration: underline;
+}
+.composer-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.composer-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.composer-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.composer-prompt {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 15px;
+}
+.composer-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 90px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #0f172a;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.composer-textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+.composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 10px;
+}
+.btn-post {
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(37,99,235,0.25);
+  transition: background-color 0.15s ease;
+}
+.btn-post:hover {
+  background-color: #1d4ed8;
+}
+.feed-filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+.filter-tab {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+.filter-tab.active {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+.filter-tab:hover:not(.active) {
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+.feed-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.post-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.post-card:hover {
+  box-shadow: 0 4px 10px rgba(0,0,0,0.07);
+}
+.post-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.post-author-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+.post-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.post-names {
+  line-height: 1.3;
+}
+.post-author-name {
+  font-weight: bold;
+  font-size: 15px;
+  color: #0f172a;
+}
+.post-author-name:hover {
+  color: #2563eb;
+}
+.post-author-handle {
+  font-size: 13px;
+  color: #64748b;
+}
+.post-meta-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.post-time {
+  font-size: 12px;
+  color: #94a3b8;
+}
+.btn-delete-post {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.btn-delete-post:hover {
+  color: #ef4444;
+  background-color: #fee2e2;
+}
+.post-body {
+  font-size: 15px;
+  color: #1e293b;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 12px;
+}
+.post-footer-actions {
+  display: flex;
+  gap: 12px;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 10px;
+}
+.post-action-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.15s ease;
+}
+.post-action-link:hover {
+  color: #2563eb;
+}
+.empty-feed {
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 40px 20px;
+  text-align: center;
+  color: #64748b;
+  font-size: 15px;
+}
+.empty-feed a {
+  color: #2563eb;
+  font-weight: bold;
+  text-decoration: none;
+}
+.empty-feed a:hover {
+  text-decoration: underline;
+}
+</style>
+
+<div class="feed-wrapper">
+  <div class="feed-top-banner">
+    <span>Welcome to your community feed! Share posts and connect.</span>
+    <a href="/tetris">🕹️ Play Tetris</a>
+  </div>
+
+  <div class="composer-card">
+    <div class="composer-header">
+      <div class="composer-avatar">{current_user_avatar}</div>
+      <div class="composer-prompt">What's on your mind, {current_user_name}?</div>
+    </div>
+    <form method="POST" action="/posts">
+      <textarea name="content" class="composer-textarea" placeholder="Share a status update, thought, or question with the community..." required maxlength="2000"></textarea>
+      <div class="composer-actions">
+        <button type="submit" class="btn-post">Post Update</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="feed-filter-bar">
+    <a href="/?filter=all" class="filter-tab {filter_all_active}">All Community Posts</a>
+    <a href="/?filter=following" class="filter-tab {filter_following_active}">Following Only</a>
+  </div>
+
+  <div class="feed-stream">
+    {posts_stream}
+  </div>
+</div>

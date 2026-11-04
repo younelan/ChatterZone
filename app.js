@@ -235,7 +235,20 @@ const server = http.createServer(async (req, res) => {
       const match = pathname.match(/^\/messages\/([^\/]+)$/);
       await routes.handleSendChatMessage(ctx, decodeURIComponent(match[1]));
     }
-    // 10. Fallback 404
+    // 17. Feed: Create Post (POST)
+    else if (pathname === '/posts' && method === 'POST') {
+      await routes.handleCreatePost(ctx);
+    }
+    // 18. Feed: Delete Post (POST)
+    else if (pathname.match(/^\/posts\/(\d+)\/delete$/) && method === 'POST') {
+      const match = pathname.match(/^\/posts\/(\d+)\/delete$/);
+      await routes.handleDeletePost(ctx, parseInt(match[1], 10));
+    }
+    // 19. Tetris Mini-Game (GET)
+    else if (pathname === '/tetris' && isGetOrHead) {
+      await routes.showTetris(ctx);
+    }
+    // Fallback 404
     else {
       ctx.status = 404;
       ctx.body = 'Not Found';

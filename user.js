@@ -40,6 +40,14 @@ db.exec(`
     FOREIGN KEY (follower_id) REFERENCES users(id),
     FOREIGN KEY (following_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
 `);
 
 console.log('Connected to SQLite database at', dbPath);
@@ -333,6 +341,69 @@ class SqliteUser {
     } catch (error) {
       console.error('Error getting following IDs:', error);
       return new Set();
+    }
+  }
+
+  // --- Feed & Posts Methods ---
+
+  async createPost(userId, content) {
+    const text = (content || '').trim();
+    if (!text) return null;
+    try {
+      const stmt = db.prepare(`
+        INSERT INTO posts (user_id, content)
+        VALUES (?, ?)
+      `);
+      const info = stmt.run(userId, text);
+      return info.lastInsertRowid;
+    } catch (error) {
+      console.error('Error creating post:', error);
+      throw error;
+    }
+  }
+
+  async getFeedPosts(userId = null, filter = 'all') {
+    try {
+      let stmt;
+      if (filter === 'following' && userId) {
+        stmt = db.prepare(`
+          SELECT p.id, p.user_id, p.content, p.created_at,
+                 u.login, u.firstname, u.lastname
+          FROM posts p
+          JOIN users u ON p.user_id = u.id
+          WHERE p.user_id = ? OR p.user_id IN (
+            SELECT following_id FROM follows WHERE follower_id = ?
+          )
+          ORDER BY p.created_at DESC, p.id DESC
+        `);
+        return stmt.all(userId, userId);
+      } else {
+        stmt = db.prepare(`
+          SELECT p.id, p.user_id, p.content, p.created_at,
+                 u.login, u.firstname, u.lastname
+          FROM posts p
+          JOIN users u ON p.user_id = u.id
+          ORDER BY p.created_at DESC, p.id DESC
+        `);
+        return stmt.all();
+      }
+    } catch (error) {
+      console.error('Error fetching feed posts:', error);
+      return [];
+    }
+  }
+
+  async deletePost(postId, userId) {
+    try {
+      const stmt = db.prepare(`
+        DELETE FROM posts
+        WHERE id = ? AND user_id = ?
+      `);
+      const info = stmt.run(postId, userId);
+      return info.changes > 0;
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      return false;
     }
   }
 }

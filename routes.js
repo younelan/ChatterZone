@@ -31,6 +31,23 @@ function getInitials(firstname, lastname, login) {
 	return initials || (login || 'U')[0].toUpperCase();
 }
 
+function formatTimeAgo(dateStr) {
+	if (!dateStr) return '';
+	const utcStr = dateStr.endsWith('Z') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
+	const date = new Date(utcStr);
+	const now = new Date();
+	const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+	if (isNaN(diffSec) || diffSec < 45) return 'Just now';
+	const diffMin = Math.floor(diffSec / 60);
+	if (diffMin < 60) return `${diffMin}m ago`;
+	const diffHr = Math.floor(diffMin / 60);
+	if (diffHr < 24) return `${diffHr}h ago`;
+	const diffDays = Math.floor(diffHr / 24);
+	if (diffDays < 7) return `${diffDays}d ago`;
+	return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 class Routes {
 	constructor() {
 		// Initialize any necessary properties or instances here
@@ -116,9 +133,84 @@ class Routes {
 
 	async showMemberArea(ctx) {
 		try {
+			if (!ctx.session.user) {
+				await this.showLogin(ctx);
+				return;
+			}
+
+			const currentUserId = ctx.session.user.id;
+			const url = new URL(ctx.req.url, `http://${ctx.req.headers.host || 'localhost'}`);
+			const filter = url.searchParams.get('filter') === 'following' ? 'following' : 'all';
+
+			const posts = await myuser.getFeedPosts(currentUserId, filter);
+			let postsHtml = '';
+
+			if (!posts || posts.length === 0) {
+				const emptyText = filter === 'following'
+					? `No posts from people you follow yet.<br><a href="/people" style="color:#2563eb;font-weight:bold;margin-top:8px;display:inline-block;">Browse community members</a> to follow someone, or switch to <a href="/?filter=all" style="color:#2563eb;font-weight:bold;">All Community Posts</a>.`
+					: `No posts yet. Be the first to share an update with the community!`;
+				postsHtml = `<div class="empty-feed">${emptyText}</div>`;
+			} else {
+				posts.forEach(post => {
+					const isOwner = currentUserId === post.user_id;
+					const initials = getInitials(post.firstname, post.lastname, post.login);
+					const safeFirst = escapeHtml(post.firstname);
+					const safeLast = escapeHtml(post.lastname);
+					const safeLogin = escapeHtml(post.login);
+					const safeContent = escapeHtml(post.content);
+					const timeStr = formatTimeAgo(post.created_at);
+
+					let deleteBtn = '';
+					if (isOwner) {
+						deleteBtn = `
+							<form method="POST" action="/posts/${post.id}/delete" style="display:inline;margin:0;" onsubmit="return confirm('Are you sure you want to delete this post?');">
+								<button type="submit" class="btn-delete-post" title="Delete post">🗑️</button>
+							</form>
+						`;
+					}
+
+					let messageAction = '';
+					if (!isOwner) {
+						messageAction = `<a href="/messages/${encodeURIComponent(post.login)}" class="post-action-link">💬 Message</a>`;
+					}
+
+					postsHtml += `
+						<div class="post-card">
+							<div class="post-header">
+								<a href="/profile/${encodeURIComponent(post.login)}" class="post-author-info">
+									<div class="post-avatar">${initials}</div>
+									<div class="post-names">
+										<div class="post-author-name">${safeFirst} ${safeLast}</div>
+										<div class="post-author-handle">@${safeLogin}</div>
+									</div>
+								</a>
+								<div class="post-meta-right">
+									<span class="post-time">${timeStr}</span>
+									${deleteBtn}
+								</div>
+							</div>
+							<div class="post-body">${safeContent}</div>
+							<div class="post-footer-actions">
+								<a href="/profile/${encodeURIComponent(post.login)}" class="post-action-link">👤 View Profile</a>
+								${messageAction}
+							</div>
+						</div>
+					`;
+				});
+			}
+
+			const currentInitials = getInitials(ctx.session.user.firstname, ctx.session.user.lastname, ctx.session.user.login);
+			const feedContent = templateHelper.render('views/feed.html', {
+				current_user_avatar: currentInitials,
+				current_user_name: escapeHtml(ctx.session.user.firstname || ctx.session.user.login),
+				filter_all_active: filter === 'all' ? 'active' : '',
+				filter_following_active: filter === 'following' ? 'active' : '',
+				posts_stream: postsHtml
+			});
+
 			const myvars = {
 				sidebar1: '<ul>' + SiteConfig.main_menu + '</ul>',
-				content: templateHelper.render('views/tetris.html', {}),
+				content: feedContent,
 				sidebar1_title: '',
 				sidebar2_title: '',
 				utility_menu: SiteConfig.utility_menu,
@@ -139,7 +231,49 @@ class Routes {
 			ctx.body = view;
 		} catch (error) {
 			console.error("Error occurred in showMemberArea route:", error);
-			// Handle error
+		}
+	}
+
+	async showTetris(ctx) {
+		try {
+			const content = templateHelper.render('views/tetris.html', {});
+			await this.showPage(ctx, { content });
+		} catch (error) {
+			console.error("Error occurred in showTetris route:", error);
+		}
+	}
+
+	async handleCreatePost(ctx) {
+		try {
+			if (!ctx.session.user) {
+				ctx.redirect('/login');
+				return;
+			}
+
+			const content = (ctx.request.body.content || '').trim();
+			if (content) {
+				await myuser.createPost(ctx.session.user.id, content);
+			}
+
+			ctx.redirect('/');
+		} catch (error) {
+			console.error("Error in handleCreatePost:", error);
+			ctx.redirect('/');
+		}
+	}
+
+	async handleDeletePost(ctx, postId) {
+		try {
+			if (!ctx.session.user) {
+				ctx.redirect('/login');
+				return;
+			}
+
+			await myuser.deletePost(postId, ctx.session.user.id);
+			ctx.redirect('/');
+		} catch (error) {
+			console.error("Error in handleDeletePost:", error);
+			ctx.redirect('/');
 		}
 	}
 

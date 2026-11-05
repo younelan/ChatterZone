@@ -53,6 +53,86 @@ class Routes {
 		// Initialize any necessary properties or instances here
 	}
 
+	getBannerInsert(theme) {
+		if (theme === 'BootstrapLight') {
+			return `
+				<div class="card border-0 shadow-sm mb-4 overflow-hidden hero-card">
+					<div class="row no-gutters align-items-center">
+						<div class="col-md-7">
+							<img src="/res/sfbanner.jpg" class="img-fluid w-100" alt="Banner">
+							<div id="slideshow" class="carousel slide" data-ride="carousel" data-interval="3000">
+								<div class="carousel-inner">
+									<div class="carousel-item active bg-danger text-white text-center py-2 font-weight-bold">Find lost friends</div>
+									<div class="carousel-item bg-success text-white text-center py-2 font-weight-bold">Stay in touch</div>
+									<div class="carousel-item bg-primary text-white text-center py-2 font-weight-bold">Play with others</div>
+									<div class="carousel-item bg-warning text-dark text-center py-2 font-weight-bold">Reinvent the world</div>
+									<div class="carousel-item bg-dark text-white text-center py-2 font-weight-bold">Do something fun</div>
+									<div class="carousel-item bg-info text-white text-center py-2 font-weight-bold">Share with others</div>
+								</div>
+							</div>
+						</div>
+						<div class="col-md-5 p-4">
+							<span class="badge badge-primary text-uppercase px-2 py-1 mb-2 font-weight-bold">Community</span>
+							<h3 class="font-weight-bold text-dark mb-1">Login Demo</h3>
+							<p class="text-muted mb-0">Let's communicate</p>
+						</div>
+					</div>
+				</div>
+			`;
+		} else if (theme === 'BootstrapDark') {
+			return `
+				<div class="card bg-secondary text-white border-0 shadow-sm mb-4 overflow-hidden hero-card">
+					<div class="row no-gutters align-items-center">
+						<div class="col-md-7">
+							<img src="/res/sfbanner.jpg" class="img-fluid w-100" alt="Banner">
+							<div id="slideshow" class="carousel slide" data-ride="carousel" data-interval="3000">
+								<div class="carousel-inner">
+									<div class="carousel-item active bg-danger text-white text-center py-2 font-weight-bold">Find lost friends</div>
+									<div class="carousel-item bg-success text-white text-center py-2 font-weight-bold">Stay in touch</div>
+									<div class="carousel-item bg-primary text-white text-center py-2 font-weight-bold">Play with others</div>
+									<div class="carousel-item bg-warning text-dark text-center py-2 font-weight-bold">Reinvent the world</div>
+									<div class="carousel-item bg-dark text-white text-center py-2 font-weight-bold">Do something fun</div>
+									<div class="carousel-item bg-info text-white text-center py-2 font-weight-bold">Share with others</div>
+								</div>
+							</div>
+						</div>
+						<div class="col-md-5 p-4">
+							<span class="badge badge-primary text-uppercase px-2 py-1 mb-2 font-weight-bold">Community</span>
+							<h3 class="font-weight-bold text-white mb-1">Login Demo</h3>
+							<p class="text-light mb-0" style="opacity: 0.8;">Let's communicate</p>
+						</div>
+					</div>
+				</div>
+			`;
+		} else if (theme === 'basic') {
+			return '';
+		} else {
+			// bluezone & default
+			return `
+				<div class="hero-showcase">
+					<div class="showcase-visual">
+						<div class="banner-frame">
+							<img src="/res/sfbanner.jpg" alt="Community Banner">
+						</div>
+						<div id="slideshow">
+							<div style="background-color:#ef4444;color:white">Find lost friends</div>
+							<div style="background-color:#10b981;color:white">Stay in touch</div>
+							<div style="background-color:#3b82f6;color:white">Play with others</div>
+							<div style="background-color:#f59e0b;color:white">Reinvent the world</div>
+							<div style="background-color:#1e293b;color:white">Do something fun</div>
+							<div style="background-color:#8b5cf6;color:white">Share with others</div>
+						</div>
+					</div>
+					<div class="showcase-content">
+						<div class="showcase-badge">Community Network</div>
+						<h2>Stay Connected</h2>
+						<p>Share updates, connect with friends, and discover what's happening across the community.</p>
+					</div>
+				</div>
+			`;
+		}
+	}
+
 	async index(ctx) {
 
 		try {
@@ -72,11 +152,15 @@ class Routes {
 
 	async showLogin(ctx) {
 		try {
+			const currentTheme = ctx.session.theme || templateHelper.currentTheme;
 			const myvars = {
 				sidebar1: templateHelper.render('views/loginform.html', {}),
 				content: templateHelper.render('views/welcome.html', {}),
 				sidebar1_title: '',
 				sidebar2_title: '',
+				utility_menu: '',
+				main_menu: SiteConfig.main_menu,
+				banner_insert: this.getBannerInsert(currentTheme),
 				sidebar2: (() => {
 					let sidebar2 = 'Feel free to change the theme too:<br />';
 					for (const currentTheme in templateHelper.activeThemes) {
@@ -84,12 +168,12 @@ class Routes {
 					}
 					return sidebar2;
 				})(),
-				themepath: '/themes/' + (ctx.session.theme || templateHelper.currentTheme),
+				themepath: '/themes/' + currentTheme,
 				site_name: SiteConfig.site_name,
 				site_motto: SiteConfig.site_motto,
 			};
 
-			const view = templateHelper.render('themes/' + (ctx.session.theme || templateHelper.currentTheme) + '/index.tpl', myvars);
+			const view = templateHelper.render('themes/' + currentTheme + '/index.tpl', myvars);
 			ctx.body = view;
 		} catch (error) {
 			console.error("Error occurred in showLogin route:", error);
@@ -106,11 +190,15 @@ class Routes {
 				email: body.email || '',
 				error: errorMessage ? `<div style="color: red; font-weight: bold; margin: 10px 0; padding: 8px; background: #ffebee; border: 1px solid #ef9a9a; border-radius: 4px;">${errorMessage}</div>` : ''
 			};
+			const currentTheme = ctx.session.theme || templateHelper.currentTheme;
 			const myvars = {
 				sidebar1: 'Join the community. Fill in the form and participate.',
 				content: templateHelper.render('views/registerform.html', userInfo),
 				sidebar1_title: '',
 				sidebar2_title: '',
+				utility_menu: ctx.session.user ? SiteConfig.utility_menu : '',
+				main_menu: SiteConfig.main_menu,
+				banner_insert: '',
 				sidebar2: (() => {
 					let sidebar2 = '';
 					for (const currentTheme in templateHelper.activeThemes) {
@@ -118,12 +206,12 @@ class Routes {
 					}
 					return sidebar2;
 				})(),
-				themepath: '/themes/' + (ctx.session.theme || templateHelper.currentTheme),
+				themepath: '/themes/' + currentTheme,
 				site_name: SiteConfig.site_name,
 				site_motto: SiteConfig.site_motto,
 			};
 
-			const view = templateHelper.render('themes/' + (ctx.session.theme || templateHelper.currentTheme) + '/index.tpl', myvars);
+			const view = templateHelper.render('themes/' + currentTheme + '/index.tpl', myvars);
 			ctx.body = view;
 		} catch (error) {
 			console.error("Error occurred in showForm route:", error);
@@ -139,7 +227,8 @@ class Routes {
 			}
 
 			const currentUserId = ctx.session.user.id;
-			const url = new URL(ctx.req.url, `http://${ctx.req.headers.host || 'localhost'}`);
+			const host = (ctx.req.headers && ctx.req.headers.host) || 'localhost';
+			const url = new URL(ctx.req.url, 'http://' + host);
 			const filter = url.searchParams.get('filter') === 'following' ? 'following' : 'all';
 
 			const posts = await myuser.getFeedPosts(currentUserId, filter);
@@ -147,8 +236,8 @@ class Routes {
 
 			if (!posts || posts.length === 0) {
 				const emptyText = filter === 'following'
-					? `No posts from people you follow yet.<br><a href="/people" style="color:#2563eb;font-weight:bold;margin-top:8px;display:inline-block;">Browse community members</a> to follow someone, or switch to <a href="/?filter=all" style="color:#2563eb;font-weight:bold;">All Community Posts</a>.`
-					: `No posts yet. Be the first to share an update with the community!`;
+					? `No posts from people you follow yet. Browse <a href="/people">members</a> to follow someone, or switch to <a href="/?filter=all">For you</a>.`
+					: `No posts yet. Be the first to post!`;
 				postsHtml = `<div class="empty-feed">${emptyText}</div>`;
 			} else {
 				posts.forEach(post => {
@@ -163,38 +252,45 @@ class Routes {
 					let deleteBtn = '';
 					if (isOwner) {
 						deleteBtn = `
-							<form method="POST" action="/posts/${post.id}/delete" style="display:inline;margin:0;" onsubmit="return confirm('Are you sure you want to delete this post?');">
-								<button type="submit" class="btn-delete-post" title="Delete post">🗑️</button>
+							<form method="POST" action="/posts/${post.id}/delete" style="display:inline;margin:0;" onsubmit="return confirm('Delete this post?');">
+								<button type="submit" class="btn-post-delete" title="Delete post">✕</button>
 							</form>
 						`;
 					}
 
 					let messageAction = '';
 					if (!isOwner) {
-						messageAction = `<a href="/messages/${encodeURIComponent(post.login)}" class="post-action-link">💬 Message</a>`;
+						messageAction = `
+							<a href="/messages/${encodeURIComponent(post.login)}" class="post-action-btn">
+								<span>💬</span> Message
+							</a>
+						`;
 					}
 
 					postsHtml += `
-						<div class="post-card">
-							<div class="post-header">
-								<a href="/profile/${encodeURIComponent(post.login)}" class="post-author-info">
-									<div class="post-avatar">${initials}</div>
-									<div class="post-names">
-										<div class="post-author-name">${safeFirst} ${safeLast}</div>
-										<div class="post-author-handle">@${safeLogin}</div>
+						<article class="post-card">
+							<a href="/profile/${encodeURIComponent(post.login)}" class="post-avatar-col">
+								<div class="post-avatar">${initials}</div>
+							</a>
+							<div class="post-main-col">
+								<div class="post-header-line">
+									<div class="post-byline">
+										<a href="/profile/${encodeURIComponent(post.login)}" class="post-author">${safeFirst} ${safeLast}</a>
+										<span class="post-handle">@${safeLogin}</span>
+										<span class="post-dot">·</span>
+										<span class="post-time">${timeStr}</span>
 									</div>
-								</a>
-								<div class="post-meta-right">
-									<span class="post-time">${timeStr}</span>
 									${deleteBtn}
 								</div>
+								<div class="post-text">${safeContent}</div>
+								<div class="post-actions-row">
+									${messageAction}
+									<a href="/profile/${encodeURIComponent(post.login)}" class="post-action-btn">
+										<span>👤</span> Profile
+									</a>
+								</div>
 							</div>
-							<div class="post-body">${safeContent}</div>
-							<div class="post-footer-actions">
-								<a href="/profile/${encodeURIComponent(post.login)}" class="post-action-link">👤 View Profile</a>
-								${messageAction}
-							</div>
-						</div>
+						</article>
 					`;
 				});
 			}
@@ -215,6 +311,7 @@ class Routes {
 				sidebar2_title: '',
 				utility_menu: SiteConfig.utility_menu,
 				main_menu: SiteConfig.main_menu,
+				banner_insert: '', // Hidden when logged in!
 				sidebar2: (() => {
 					let sidebar2 = '';
 					for (const currentTheme in templateHelper.activeThemes) {
@@ -279,11 +376,15 @@ class Routes {
 
 	async showRegisterSuccess(ctx, userInfo) {
 		try {
+			const currentTheme = ctx.session.theme || templateHelper.currentTheme;
 			const myvars = {
 				sidebar1: 'Welcome to the community. You have been successfully added to the database, enjoy being with us',
 				content: templateHelper.render('views/registersuccess.html', userInfo),
 				sidebar1_title: '',
 				sidebar2_title: '',
+				utility_menu: '',
+				main_menu: SiteConfig.main_menu,
+				banner_insert: '',
 				sidebar2: (() => {
 					let sidebar2 = '';
 					for (const currentTheme in templateHelper.activeThemes) {
@@ -291,12 +392,12 @@ class Routes {
 					}
 					return sidebar2;
 				})(),
-				themepath: '/themes/' + (ctx.session.theme || templateHelper.currentTheme),
+				themepath: '/themes/' + currentTheme,
 				site_name: SiteConfig.site_name,
 				site_motto: SiteConfig.site_motto,
 			};
 
-			const view = templateHelper.render('themes/' + (ctx.session.theme || templateHelper.currentTheme) + '/index.tpl', myvars);
+			const view = templateHelper.render('themes/' + currentTheme + '/index.tpl', myvars);
 			ctx.body = view;
 		} catch (error) {
 			console.error("Error occurred in showRegisterSuccess route:", error);
@@ -306,13 +407,15 @@ class Routes {
 
 	async showPage(ctx, params) {
 		try {
+			const currentTheme = ctx.session.theme || templateHelper.currentTheme;
 			const myvars = {
 				sidebar1: '<ul>' + SiteConfig.main_menu + '</ul>',
 				content: templateHelper.render('views/memberpage.html', params),
 				sidebar1_title: '',
 				sidebar2_title: '',
-				utility_menu: SiteConfig.utility_menu,
+				utility_menu: ctx.session.user ? SiteConfig.utility_menu : '',
 				main_menu: SiteConfig.main_menu,
+				banner_insert: '', // Hidden on inner pages!
 				sidebar2: (() => {
 					let sidebar2 = '';
 					for (const currentTheme in templateHelper.activeThemes) {
@@ -320,12 +423,12 @@ class Routes {
 					}
 					return sidebar2;
 				})(),
-				themepath: '/themes/' + (ctx.session.theme || templateHelper.currentTheme),
+				themepath: '/themes/' + currentTheme,
 				site_name: SiteConfig.site_name,
 				site_motto: SiteConfig.site_motto,
 			};
 
-			const view = templateHelper.render('themes/' + (ctx.session.theme || templateHelper.currentTheme) + '/index.tpl', myvars);
+			const view = templateHelper.render('themes/' + currentTheme + '/index.tpl', myvars);
 			ctx.body = view;
 		} catch (error) {
 			console.error("Error occurred in showPage route:", error);
@@ -406,14 +509,14 @@ class Routes {
 			let messageButton = '';
 
 			if (isOwner) {
-				editButton = `<a href="/profile/${encodeURIComponent(user.login)}/edit" class="btn-edit">✏️ Edit My Profile</a>`;
+				editButton = `<a href="/profile/${encodeURIComponent(user.login)}/edit" class="btn-edit">Edit profile</a>`;
 			} else if (ctx.session.user) {
-				messageButton = `<a href="/messages/${encodeURIComponent(user.login)}" class="btn-message">💬 Message</a>`;
+				messageButton = `<a href="/messages/${encodeURIComponent(user.login)}" class="btn-message">Message</a>`;
 				if (isFollowing) {
 					followButton = `
 						<form method="POST" action="/profile/${encodeURIComponent(user.login)}/unfollow" style="display:inline">
 							<button type="submit" class="btn-unfollow" title="Click to Unfollow">
-								<span class="text-following">✓ Following</span>
+								<span class="text-following">Following</span>
 								<span class="text-unfollow">Unfollow</span>
 							</button>
 						</form>
@@ -421,13 +524,13 @@ class Routes {
 				} else {
 					followButton = `
 						<form method="POST" action="/profile/${encodeURIComponent(user.login)}/follow" style="display:inline">
-							<button type="submit" class="btn-follow">+ Follow</button>
+							<button type="submit" class="btn-follow">Follow</button>
 						</form>
 					`;
 				}
 			} else {
-				followButton = `<a href="/login" class="btn-follow">+ Follow</a>`;
-				messageButton = `<a href="/login" class="btn-message">💬 Message</a>`;
+				followButton = `<a href="/login" class="btn-follow">Follow</a>`;
+				messageButton = `<a href="/login" class="btn-message">Message</a>`;
 			}
 
 			const url = new URL(ctx.req.url, `http://${ctx.req.headers.host || 'localhost'}`);
@@ -659,13 +762,13 @@ class Routes {
 					let actionButtons = `<a href="/profile/${encodeURIComponent(person.login)}" class="btn-conn-view">Profile</a>`;
 
 					if (currentUserId && !isSelf) {
-						actionButtons += `<a href="/messages/${encodeURIComponent(person.login)}" class="btn-conn-msg">💬 Message</a>`;
+						actionButtons += `<a href="/messages/${encodeURIComponent(person.login)}" class="btn-conn-msg">Message</a>`;
 						if (isFollowedByMe) {
 							actionButtons += `
 								<form method="POST" action="/profile/${encodeURIComponent(person.login)}/unfollow" style="display:inline;margin:0;">
 									<input type="hidden" name="returnTo" value="${escapeHtml(currentUrl)}">
 									<button type="submit" class="btn-conn-unfollow" title="Click to Unfollow">
-										<span class="text-following">✓ Following</span>
+										<span class="text-following">Following</span>
 										<span class="text-unfollow">Unfollow</span>
 									</button>
 								</form>
@@ -674,14 +777,14 @@ class Routes {
 							actionButtons += `
 								<form method="POST" action="/profile/${encodeURIComponent(person.login)}/follow" style="display:inline;margin:0;">
 									<input type="hidden" name="returnTo" value="${escapeHtml(currentUrl)}">
-									<button type="submit" class="btn-conn-follow">+ Follow</button>
+									<button type="submit" class="btn-conn-follow">Follow</button>
 								</form>
 							`;
 						}
 					} else if (!currentUserId) {
 						actionButtons += `
-							<a href="/login" class="btn-conn-msg">💬 Message</a>
-							<a href="/login" class="btn-conn-follow">+ Follow</a>
+							<a href="/login" class="btn-conn-msg">Message</a>
+							<a href="/login" class="btn-conn-follow">Follow</a>
 						`;
 					}
 
@@ -704,7 +807,7 @@ class Routes {
 			}
 
 			const backUrl = isOwner ? '/profile' : `/profile/${encodeURIComponent(user.login)}`;
-			const backText = isOwner ? 'Back to My Profile' : `Back to @${escapeHtml(user.login)}'s Profile`;
+			const backText = isOwner ? 'Back to profile' : `@${escapeHtml(user.login)}`;
 
 			const content = templateHelper.render('views/connections.html', {
 				profile_login: escapeHtml(user.login),

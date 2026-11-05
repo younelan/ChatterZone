@@ -244,8 +244,8 @@ const server = http.createServer(async (req, res) => {
       const match = pathname.match(/^\/posts\/(\d+)\/delete$/);
       await routes.handleDeletePost(ctx, parseInt(match[1], 10));
     }
-    // 19. Tetris Mini-Game (GET)
-    else if (pathname === '/tetris' && isGetOrHead) {
+    // 19. Games: Play / Tetris (GET)
+    else if ((pathname === '/tetris' || pathname === '/play') && isGetOrHead) {
       await routes.showTetris(ctx);
     }
     // Fallback 404

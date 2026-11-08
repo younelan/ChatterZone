@@ -1,85 +1,53 @@
-	<!DOCTYPE html>
-	<head>
-	<title>{site_name}</title>
-	<link href='http://fonts.googleapis.com/css?family=Alfa+Slab+One|Headland+One|Gilda+Display|Noto+Serif|Merriweather+Sans|Tauri|Monda|Trocchi|Merriweather+Sans|Scada&subset=latin,latin-ext' rel='stylesheet' type='text/css'><link rel='stylesheet' href='{themepath}/index.css'>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{site_name}</title>
+    <link rel="stylesheet" href="{themepath}/index.css">
+</head>
+<body>
+<div id="wrapper">
+    <!-- Cool Modern Navigation Header (Only utility on top to prevent duplicates) -->
+    <header class="header">
+        <div class="brand-bar">
+            <a href="/" class="site-brand">
+                <span class="brand-icon">⚡</span>
+                <div class="brand-text">
+                    <span class="site-title">{site_name}</span>
+                    <span class="site-motto">{site_motto}</span>
+                </div>
+            </a>
+        </div>
+        <nav class="header-utility">
+            <ul>
+                {utility_menu}
+            </ul>
+        </nav>
+    </header>
 
-	</head>
-	<html>
-	<body>
-	<div id='wrapper'>
-		<div class=header>
-			<div class=nav>
-				<ul>
-				{utility_menu}
-				</ul>
-			</div>
+    {banner_insert}
 
-			<div class=leftnav>
-				<ul>
-				{main_menu}
-				</ul>
-			</div>
-		</div>
-		<div class=topdiv>
-			<div id='banner'>
-				<img src=/res/sfbanner.jpg><br/>
-				<div id="slideshow">
-					<div style='background-color:red;color:white'>
-						Find lost friends
-					</div>
-					<div style='background-color:green;color:white'>
-						Stay in touch
-					</div>
-					<div style='background-color:blue;color:white'>
-						Play with others
-					</div>
-					<div style='background-color:orange;color:white'>
-						Reinvent the world
-					</div>
-					<div style='background-color:black;color:white'>
-						Do Something fun
-					</div>	
-					<div style='background-color:purple;color:white'>
-						Share with others
-					</div>	
-				</div>
-				<br/>
-			</div>
-
-			<div class=topdivText>
-				<a href='/'><div class=siteTitle>{site_name}
-					</div>
-					<div class=siteMotto>
-				{site_motto} 
-					</div>
-				</a>
-			</div>
-		</div>
-
-		<div id='content'>
-			{content}
-		</div>
-		<div class='sidebarDiv'>
-			<div class=sidebartitleWrapper>
-				<div class=sidebarTitle>
-					Menu
-				</div>
-
-			</div>
-			{sidebar1}
-			<div>
-			<div class=sidebartitleWrapper>
-				<div class=sidebarTitle>
-					Theme
-				</div>
-
-			</div>
-			{sidebar2}
-		</div>
-
-		</div>
-	</div>
-
-	</body>
-	</html>
-
+    <!-- Main Content & Sidebar -->
+    <div class="main-body-row">
+        <div id="content">
+            {content}
+        </div>
+        <aside class="sidebarDiv">
+            <div class="sidebar-box">
+                <div class="sidebar-box-header">Navigation</div>
+                <div class="sidebar-box-body">
+                    {sidebar1}
+                </div>
+            </div>
+            <div class="sidebar-box theme-box">
+                <div class="sidebar-box-header">Switch Theme</div>
+                <div class="sidebar-box-body theme-list">
+                    {sidebar2}
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+</body>
+</html>

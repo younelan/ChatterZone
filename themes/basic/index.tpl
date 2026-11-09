@@ -1,19 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
-<link rel="stylesheet" href="{themepath}/screen.css">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{site_name}</title>
+    <link rel="stylesheet" href="{themepath}/screen.css">
+</head>
 <body>
-<div id=sidebar>
+<div class="simple-container">
+    <header class="simple-header">
+        <div class="simple-brand">
+            <a href="/"><strong>{site_name}</strong> - <span>{site_motto}</span></a>
+        </div>
+        <nav class="simple-utility">
+            <ul>
+                {utility_menu}
+            </ul>
+        </nav>
+    </header>
 
-<h1>{site_name}</h1>
-{site_motto}
-
-<br>
-{sidebar1}
-<p>
-{sidebar2}
-</p>
- </div>
- <div id=content>
-{content}
- </div>
- 
+    <div class="simple-layout">
+        <main id="content">
+            {content}
+        </main>
+        <aside id="sidebar">
+            <div class="simple-sidebar-section">
+                <h4>Menu</h4>
+                {sidebar1}
+            </div>
+            <div class="simple-sidebar-section">
+                <h4>Theme</h4>
+                {sidebar2}
+            </div>
+        </aside>
+    </div>
+</div>
+</body>
+</html>

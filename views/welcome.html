@@ -1,13 +1,117 @@
+<style>
+.welcome-hero {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    color: #1e293b;
+}
+.welcome-hero h2 {
+    margin: 0 0 8px 0;
+    font-size: 24px;
+    color: #0f172a;
+    font-weight: 800;
+}
+.welcome-hero .hero-sub {
+    font-size: 15px;
+    color: #64748b;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+.welcome-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+}
+.feature-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.feature-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+.feature-icon {
+    font-size: 22px;
+    margin-bottom: 6px;
+}
+.feature-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: #0f172a;
+    margin-bottom: 4px;
+}
+.feature-desc {
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.4;
+}
+.welcome-cta {
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.cta-text {
+    font-size: 14px;
+    color: #475569;
+}
+.btn-join {
+    display: inline-block;
+    background: #2563eb;
+    color: #ffffff;
+    padding: 10px 22px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 14px;
+    box-shadow: 0 2px 4px rgba(37,99,235,0.25);
+    transition: background 0.15s ease;
+}
+.btn-join:hover {
+    background: #1d4ed8;
+    color: #ffffff;
+}
+</style>
 
-<h2>Welcome</h2>
+<div class="welcome-hero">
+    <h2>Connect, Share & Discover</h2>
+    <p class="hero-sub">Welcome to our community network. A place to stay in touch, share thoughts, and build connections.</p>
 
-<p>Hi and welcome to the <b>Node Login Demo</b>, a simple login demo using node, mongo, express.</p>
-<p>
-This was created a basic login demo for <a href='http://www.nodejs.org'>Node js</a> and MongoDB to store data.</p>
-<p>Feel free to register and poke around. <p>
-<p>This is definitely not for competing with social network giants and this still needs a lot of work but it shows off a few components.</p
+    <div class="welcome-features">
+        <div class="feature-item">
+            <div class="feature-icon">📰</div>
+            <div class="feature-title">Live Feed</div>
+            <div class="feature-desc">Share updates and see what the community is talking about.</div>
+        </div>
+        <div class="feature-item">
+            <div class="feature-icon">👥</div>
+            <div class="feature-title">Follow & Connect</div>
+            <div class="feature-desc">Follow members, build your network, and see their latest activity.</div>
+        </div>
+        <div class="feature-item">
+            <div class="feature-icon">💬</div>
+            <div class="feature-title">Direct Messages</div>
+            <div class="feature-desc">Start 1-on-1 private conversations with other members.</div>
+        </div>
+        <div class="feature-item">
+            <div class="feature-icon">🕹️</div>
+            <div class="feature-title">Community Fun</div>
+            <div class="feature-desc">Take a break and play built-in games like Tetris.</div>
+        </div>
+    </div>
 
-<p>
-Feel free to send us suggestions.
-</p>
-<p>Meanwhile Have fun, redefine limits and enjoy life!</p>
+    <div class="welcome-cta">
+        <span class="cta-text">Ready to be part of the community?</span>
+        <a href="/register" class="btn-join">Join Now &rarr;</a>
+    </div>
+</div>

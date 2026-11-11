@@ -30,7 +30,8 @@
 }
 .edit-form-group input[type="text"],
 .edit-form-group input[type="email"],
-.edit-form-group textarea {
+.edit-form-group textarea,
+.edit-form-group select {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #cbd5e1;
@@ -41,7 +42,8 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .edit-form-group input:focus,
-.edit-form-group textarea:focus {
+.edit-form-group textarea:focus,
+.edit-form-group select:focus {
   outline: none;
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
@@ -127,6 +129,14 @@
     <div class="edit-form-group">
       <label for="bio">About Me / Bio</label>
       <textarea id="bio" name="bio" rows="4" placeholder="Tell the community a little about yourself...">{bio}</textarea>
+    </div>
+
+    <div class="edit-form-group">
+      <label for="theme">Site Theme</label>
+      <select id="theme" name="theme">
+        {theme_options}
+      </select>
+      <small style="color: #64748b; font-size: 12px;">Choose your preferred look and feel.</small>
     </div>
 
     <div class="edit-form-actions">

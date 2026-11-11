@@ -17,7 +17,8 @@ db.exec(`
     lastname TEXT NOT NULL,
     password TEXT NOT NULL,
     confirm TEXT,
-    bio TEXT DEFAULT ''
+    bio TEXT DEFAULT '',
+    theme TEXT DEFAULT ''
   );
 
   CREATE TABLE IF NOT EXISTS messages (
@@ -49,6 +50,13 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 `);
+
+// Migration: add theme column to users if it doesn't exist yet
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN theme TEXT DEFAULT ''`);
+} catch (e) {
+  // Column already exists — safe to ignore
+}
 
 console.log('Connected to SQLite database at', dbPath);
 
@@ -119,7 +127,8 @@ class SqliteUser {
         SET firstname = @firstname,
             lastname = @lastname,
             email = @email,
-            bio = @bio
+            bio = @bio,
+            theme = @theme
         WHERE id = @id
       `);
       stmt.run({
@@ -127,7 +136,8 @@ class SqliteUser {
         firstname: updateData.firstname,
         lastname: updateData.lastname,
         email: updateData.email,
-        bio: updateData.bio || ''
+        bio: updateData.bio || '',
+        theme: updateData.theme || ''
       });
       return await this.findUser({ id });
     } catch (error) {

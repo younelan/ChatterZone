@@ -152,7 +152,7 @@ class Routes {
 
 	async showLogin(ctx) {
 		try {
-			const currentTheme = ctx.session.theme || templateHelper.currentTheme;
+			const currentTheme = ctx.session.theme || SiteConfig.default_theme || templateHelper.currentTheme;
 			const myvars = {
 				sidebar1: templateHelper.render('views/loginform.html', {}),
 				content: templateHelper.render('views/welcome.html', {}),
@@ -161,13 +161,7 @@ class Routes {
 				utility_menu: '',
 				main_menu: SiteConfig.main_menu,
 				banner_insert: this.getBannerInsert(currentTheme),
-				sidebar2: (() => {
-					let sidebar2 = 'Feel free to change the theme too:<br />';
-					for (const currentTheme in templateHelper.activeThemes) {
-						sidebar2 += `<a href=/settheme/${currentTheme}>${templateHelper.activeThemes[currentTheme]}</a><br>`;
-					}
-					return sidebar2;
-				})(),
+				sidebar2: '',
 				themepath: '/themes/' + currentTheme,
 				site_name: SiteConfig.site_name,
 				site_motto: SiteConfig.site_motto,
@@ -190,7 +184,7 @@ class Routes {
 				email: body.email || '',
 				error: errorMessage ? `<div style="color: red; font-weight: bold; margin: 10px 0; padding: 8px; background: #ffebee; border: 1px solid #ef9a9a; border-radius: 4px;">${errorMessage}</div>` : ''
 			};
-			const currentTheme = ctx.session.theme || templateHelper.currentTheme;
+			const currentTheme = ctx.session.theme || SiteConfig.default_theme || templateHelper.currentTheme;
 			const myvars = {
 				sidebar1: 'Join the community. Fill in the form and participate.',
 				content: templateHelper.render('views/registerform.html', userInfo),
@@ -199,13 +193,7 @@ class Routes {
 				utility_menu: ctx.session.user ? SiteConfig.utility_menu : '',
 				main_menu: SiteConfig.main_menu,
 				banner_insert: '',
-				sidebar2: (() => {
-					let sidebar2 = '';
-					for (const currentTheme in templateHelper.activeThemes) {
-						sidebar2 += `<a href=/settheme/${currentTheme}>${templateHelper.activeThemes[currentTheme]}</a><br>`;
-					}
-					return sidebar2;
-				})(),
+				sidebar2: '',
 				themepath: '/themes/' + currentTheme,
 				site_name: SiteConfig.site_name,
 				site_motto: SiteConfig.site_motto,
@@ -312,19 +300,13 @@ class Routes {
 				utility_menu: SiteConfig.utility_menu,
 				main_menu: SiteConfig.main_menu,
 				banner_insert: '', // Hidden when logged in!
-				sidebar2: (() => {
-					let sidebar2 = '';
-					for (const currentTheme in templateHelper.activeThemes) {
-						sidebar2 += `<a href=/settheme/${currentTheme}>${templateHelper.activeThemes[currentTheme]}</a><br>`;
-					}
-					return sidebar2;
-				})(),
-				themepath: '/themes/' + (ctx.session.theme || templateHelper.currentTheme),
+				sidebar2: '',
+				themepath: '/themes/' + (ctx.session.theme || SiteConfig.default_theme || templateHelper.currentTheme),
 				site_name: SiteConfig.site_name,
 				site_motto: SiteConfig.site_motto,
 			};
 
-			const view = templateHelper.render('themes/' + (ctx.session.theme || templateHelper.currentTheme) + '/index.tpl', myvars);
+			const view = templateHelper.render('themes/' + (ctx.session.theme || SiteConfig.default_theme || templateHelper.currentTheme) + '/index.tpl', myvars);
 			ctx.body = view;
 		} catch (error) {
 			console.error("Error occurred in showMemberArea route:", error);
@@ -376,7 +358,7 @@ class Routes {
 
 	async showRegisterSuccess(ctx, userInfo) {
 		try {
-			const currentTheme = ctx.session.theme || templateHelper.currentTheme;
+			const currentTheme = ctx.session.theme || SiteConfig.default_theme || templateHelper.currentTheme;
 			const myvars = {
 				sidebar1: 'Welcome to the community. You have been successfully added to the database, enjoy being with us',
 				content: templateHelper.render('views/registersuccess.html', userInfo),
@@ -385,13 +367,7 @@ class Routes {
 				utility_menu: '',
 				main_menu: SiteConfig.main_menu,
 				banner_insert: '',
-				sidebar2: (() => {
-					let sidebar2 = '';
-					for (const currentTheme in templateHelper.activeThemes) {
-						sidebar2 += `<a href=/settheme/${currentTheme}>${templateHelper.activeThemes[currentTheme]}</a><br>`;
-					}
-					return sidebar2;
-				})(),
+				sidebar2: '',
 				themepath: '/themes/' + currentTheme,
 				site_name: SiteConfig.site_name,
 				site_motto: SiteConfig.site_motto,
@@ -407,7 +383,7 @@ class Routes {
 
 	async showPage(ctx, params) {
 		try {
-			const currentTheme = ctx.session.theme || templateHelper.currentTheme;
+			const currentTheme = ctx.session.theme || SiteConfig.default_theme || templateHelper.currentTheme;
 			const myvars = {
 				sidebar1: '<ul>' + SiteConfig.main_menu + '</ul>',
 				content: templateHelper.render('views/memberpage.html', params),
@@ -416,13 +392,7 @@ class Routes {
 				utility_menu: ctx.session.user ? SiteConfig.utility_menu : '',
 				main_menu: SiteConfig.main_menu,
 				banner_insert: '', // Hidden on inner pages!
-				sidebar2: (() => {
-					let sidebar2 = '';
-					for (const currentTheme in templateHelper.activeThemes) {
-						sidebar2 += `<a href=/settheme/${currentTheme}>${templateHelper.activeThemes[currentTheme]}</a><br>`;
-					}
-					return sidebar2;
-				})(),
+				sidebar2: '',
 				themepath: '/themes/' + currentTheme,
 				site_name: SiteConfig.site_name,
 				site_motto: SiteConfig.site_motto,
@@ -582,13 +552,17 @@ class Routes {
 				? `<div class="edit-error">${escapeHtml(errorMessage)}</div>`
 				: '';
 
+			const userTheme = data.theme || user.theme || SiteConfig.default_theme || templateHelper.currentTheme;
 			const content = templateHelper.render('views/profile_edit.html', {
 				login: escapeHtml(user.login),
 				firstname: escapeHtml(data.firstname || ''),
 				lastname: escapeHtml(data.lastname || ''),
 				email: escapeHtml(data.email || ''),
 				bio: escapeHtml(data.bio || ''),
-				error: errorHtml
+				error: errorHtml,
+				theme_options: Object.entries(templateHelper.activeThemes).map(([k, v]) =>
+					`<option value="${k}"${k === userTheme ? ' selected' : ''}>${v}</option>`
+				).join('')
 			});
 
 			await this.showPage(ctx, { content });
@@ -609,11 +583,14 @@ class Routes {
 				return;
 			}
 
-			const { firstname, lastname, email, bio } = ctx.request.body;
+			const { firstname, lastname, email, bio, theme } = ctx.request.body;
 			const cleanFirst = (firstname || '').trim();
 			const cleanLast = (lastname || '').trim();
 			const cleanEmail = (email || '').trim();
 			const cleanBio = (bio || '').trim();
+			const cleanTheme = templateHelper.activeThemes.hasOwnProperty(theme)
+				? theme
+				: (SiteConfig.default_theme || templateHelper.currentTheme);
 
 			if (!cleanFirst || !cleanLast) {
 				await this.showEditProfile(ctx, username, 'First name and Last name are required.', ctx.request.body);
@@ -636,11 +613,13 @@ class Routes {
 				firstname: cleanFirst,
 				lastname: cleanLast,
 				email: cleanEmail,
-				bio: cleanBio
+				bio: cleanBio,
+				theme: cleanTheme
 			});
 
 			// Update session with fresh details
 			ctx.session.user = updated;
+			ctx.session.theme = cleanTheme;
 			ctx.redirect(`/profile/${encodeURIComponent(username)}?updated=1`);
 		} catch (error) {
 			console.error("Error occurred in updateProfile route:", error);
@@ -1015,6 +994,7 @@ class Routes {
 				if (isPasswordMatch) {
 					// Set session user and redirect to home page
 					ctx.session.user = user;
+					ctx.session.theme = user.theme || SiteConfig.default_theme || templateHelper.currentTheme;
 					ctx.redirect('/');
 				} else {
 					// User not found, show login page

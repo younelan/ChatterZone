@@ -40,12 +40,6 @@
                     {sidebar1}
                 </div>
             </div>
-            <div class="sidebar-box theme-box">
-                <div class="sidebar-box-header">Switch Theme</div>
-                <div class="sidebar-box-body theme-list">
-                    {sidebar2}
-                </div>
-            </div>
         </aside>
     </div>
 </div>

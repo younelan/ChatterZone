@@ -28,10 +28,6 @@
                 <h4>Menu</h4>
                 {sidebar1}
             </div>
-            <div class="simple-sidebar-section">
-                <h4>Theme</h4>
-                {sidebar2}
-            </div>
         </aside>
     </div>
 </div>

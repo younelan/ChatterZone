@@ -48,15 +48,6 @@
                     </div>
                 </div>
 
-                <!-- Theme Switcher Card -->
-                <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white font-weight-bold text-uppercase text-muted small py-3 border-bottom">
-                        Theme
-                    </div>
-                    <div class="card-body p-3 theme-switch-body">
-                        {sidebar2}
-                    </div>
-                </div>
             </div>
         </div>
     </div>

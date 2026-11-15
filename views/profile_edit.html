@@ -96,15 +96,51 @@
   font-size: 14px;
   font-weight: 500;
 }
+.edit-profile-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  margin-bottom: 10px;
+}
+.profile-media-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+.profile-media-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #475569;
+}
+.profile-media-option input {
+  width: auto;
+  margin: 0;
+}
+.profile-media-option img {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  object-fit: cover;
+}
 </style>
 
 <div class="profile-edit-card">
   <h2>Edit Profile</h2>
-  <div class="profile-edit-subtitle">Update your personal details and community bio.</div>
+  <div class="profile-edit-subtitle">Update your personal details, profile picture, and community bio.</div>
 
   {error}
 
-  <form method="POST" action="/profile/{login}/edit">
+  <form method="POST" action="/profile/{login}/edit" enctype="multipart/form-data">
     <div class="edit-form-group">
       <label>Username</label>
       <input type="text" value="{login}" disabled />
@@ -129,6 +165,14 @@
     <div class="edit-form-group">
       <label for="bio">About Me / Bio</label>
       <textarea id="bio" name="bio" rows="4" placeholder="Tell the community a little about yourself...">{bio}</textarea>
+    </div>
+
+    <div class="edit-form-group">
+      <label for="profile_image">Profile Picture</label>
+      {profile_image_preview}
+      <input type="file" id="profile_image" name="profile_image" accept="image/png,image/jpeg,image/gif,image/webp" />
+      <small style="color: #64748b; font-size: 12px;">PNG, JPEG, GIF, or WebP; maximum 5 MB. Upload a new photo or select one from your collection below.</small>
+      <div class="profile-media-grid">{media_options}</div>
     </div>
 
     <div class="edit-form-group">

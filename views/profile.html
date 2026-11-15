@@ -39,6 +39,7 @@
   justify-content: center;
   font-size: 34px;
   font-weight: bold;
+  object-fit: cover;
 }
 .profile-actions {
   display: flex;
@@ -217,9 +218,7 @@
   <div class="profile-banner"></div>
   <div class="profile-content">
     <div class="profile-header-bar">
-      <div class="profile-avatar-large">
-        {avatar_initials}
-      </div>
+      {avatar_markup}
       <div class="profile-actions">
         {follow_button}
         {message_button}

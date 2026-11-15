@@ -76,6 +76,7 @@
   font-weight: bold;
   font-size: 15px;
   flex-shrink: 0;
+  object-fit: cover;
 }
 .composer-trigger-box {
   flex: 1;
@@ -192,6 +193,7 @@
   justify-content: center;
   font-weight: bold;
   font-size: 14px;
+  object-fit: cover;
 }
 .post-main-col {
   flex: 1;
@@ -304,7 +306,7 @@
   <div class="composer-box">
     <!-- Compact initial view -->
     <div id="composer-compact" class="composer-compact" onclick="expandComposer()">
-      <div class="composer-avatar">{current_user_avatar}</div>
+      {current_user_avatar}
       <div class="composer-trigger-box">What's happening?</div>
     </div>
 
@@ -312,7 +314,7 @@
     <div id="composer-expanded" class="composer-expanded" style="display: none;">
       <form method="POST" action="/posts" id="composer-form">
         <div class="composer-top-row">
-          <div class="composer-avatar">{current_user_avatar}</div>
+          {current_user_avatar}
           <textarea id="composer-textarea" name="content" class="composer-textarea" placeholder="What's happening?" required maxlength="2000"></textarea>
         </div>
         <div class="composer-bottom-bar">

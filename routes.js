@@ -1,6 +1,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import crypto from 'node:crypto';
 import { SqliteUser } from './user.js';
 const myuser = new SqliteUser();
 
@@ -9,6 +10,7 @@ import FormHelper from './form_helper.js';
 import bcrypt from 'bcryptjs';
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const uploadsDir = path.join(__dirname, 'uploads');
 
 const siteConfigPath = path.join(__dirname, 'config', 'siteConfig.json');
 const siteConfigRaw = fs.readFileSync(siteConfigPath);
@@ -29,6 +31,29 @@ function getInitials(firstname, lastname, login) {
 	const l = (lastname || '').trim()[0] || '';
 	const initials = (f + l).toUpperCase();
 	return initials || (login || 'U')[0].toUpperCase();
+}
+
+function getAvatarMarkup(user, className) {
+	const initials = escapeHtml(getInitials(user.firstname, user.lastname, user.login));
+	if (!user.profile_image) return `<div class="${className}">${initials}</div>`;
+	const imageUrl = `/uploads/${encodeURIComponent(user.profile_image)}`;
+	return `<img class="${className} ${className}-photo" src="${imageUrl}" alt="${initials}">`;
+}
+
+function getImageType(data) {
+	if (data.length >= 8 && data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+		return { mimeType: 'image/png', extension: 'png' };
+	}
+	if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) {
+		return { mimeType: 'image/jpeg', extension: 'jpg' };
+	}
+	if (data.length >= 6 && ['GIF87a', 'GIF89a'].includes(data.subarray(0, 6).toString('ascii'))) {
+		return { mimeType: 'image/gif', extension: 'gif' };
+	}
+	if (data.length >= 12 && data.toString('ascii', 0, 4) === 'RIFF' && data.toString('ascii', 8, 12) === 'WEBP') {
+		return { mimeType: 'image/webp', extension: 'webp' };
+	}
+	return null;
 }
 
 function formatTimeAgo(dateStr) {
@@ -230,7 +255,7 @@ class Routes {
 			} else {
 				posts.forEach(post => {
 					const isOwner = currentUserId === post.user_id;
-					const initials = getInitials(post.firstname, post.lastname, post.login);
+					const avatar = getAvatarMarkup(post, 'post-avatar');
 					const safeFirst = escapeHtml(post.firstname);
 					const safeLast = escapeHtml(post.lastname);
 					const safeLogin = escapeHtml(post.login);
@@ -258,7 +283,7 @@ class Routes {
 					postsHtml += `
 						<article class="post-card">
 							<a href="/profile/${encodeURIComponent(post.login)}" class="post-avatar-col">
-								<div class="post-avatar">${initials}</div>
+								${avatar}
 							</a>
 							<div class="post-main-col">
 								<div class="post-header-line">
@@ -283,9 +308,8 @@ class Routes {
 				});
 			}
 
-			const currentInitials = getInitials(ctx.session.user.firstname, ctx.session.user.lastname, ctx.session.user.login);
 			const feedContent = templateHelper.render('views/feed.html', {
-				current_user_avatar: currentInitials,
+				current_user_avatar: getAvatarMarkup(ctx.session.user, 'composer-avatar'),
 				current_user_name: escapeHtml(ctx.session.user.firstname || ctx.session.user.login),
 				filter_all_active: filter === 'all' ? 'active' : '',
 				filter_following_active: filter === 'following' ? 'active' : '',
@@ -415,7 +439,7 @@ class Routes {
 				userCards = '<div class="empty-members">No registered community members yet.</div>';
 			} else {
 				users.forEach(user => {
-					const initials = getInitials(user.firstname, user.lastname, user.login);
+					const avatar = getAvatarMarkup(user, 'member-avatar');
 					const safeFirst = escapeHtml(user.firstname);
 					const safeLast = escapeHtml(user.lastname);
 					const safeLogin = escapeHtml(user.login);
@@ -424,7 +448,7 @@ class Routes {
 					userCards += `
 						<a href="/profile/${encodeURIComponent(user.login)}" class="member-card">
 							<div class="member-top">
-								<div class="member-avatar">${initials}</div>
+								${avatar}
 								<div class="member-names">
 									<div class="member-fullname">${safeFirst} ${safeLast}</div>
 									<div class="member-username">@${safeLogin}</div>
@@ -509,7 +533,7 @@ class Routes {
 				: '';
 
 			const content = templateHelper.render('views/profile.html', {
-				avatar_initials: getInitials(user.firstname, user.lastname, user.login),
+				avatar_markup: getAvatarMarkup(user, 'profile-avatar-large'),
 				firstname: escapeHtml(user.firstname),
 				lastname: escapeHtml(user.lastname),
 				login: escapeHtml(user.login),
@@ -548,17 +572,27 @@ class Routes {
 			}
 
 			const data = formData || user;
+			const userMedia = await myuser.getUserMedia(user.id);
 			const errorHtml = errorMessage
 				? `<div class="edit-error">${escapeHtml(errorMessage)}</div>`
 				: '';
 
 			const userTheme = data.theme || user.theme || SiteConfig.default_theme || templateHelper.currentTheme;
+			const selectedMediaId = Number(data.selected_media_id || user.profile_media_id);
 			const content = templateHelper.render('views/profile_edit.html', {
 				login: escapeHtml(user.login),
 				firstname: escapeHtml(data.firstname || ''),
 				lastname: escapeHtml(data.lastname || ''),
 				email: escapeHtml(data.email || ''),
 				bio: escapeHtml(data.bio || ''),
+				profile_image_preview: user.profile_image ? getAvatarMarkup(user, 'edit-profile-avatar') : '',
+				media_options: userMedia.map(media => `
+					<label class="profile-media-option">
+						<input type="radio" name="selected_media_id" value="${media.id}"${media.id === selectedMediaId ? ' checked' : ''}>
+						<img src="/uploads/${encodeURIComponent(media.file_name)}" alt="">
+						<span>Use this photo</span>
+					</label>
+				`).join(''),
 				error: errorHtml,
 				theme_options: Object.entries(templateHelper.activeThemes).map(([k, v]) =>
 					`<option value="${k}"${k === userTheme ? ' selected' : ''}>${v}</option>`
@@ -584,6 +618,9 @@ class Routes {
 			}
 
 			const { firstname, lastname, email, bio, theme } = ctx.request.body;
+			const rawSelectedMediaId = typeof ctx.request.body.selected_media_id === 'string'
+				? ctx.request.body.selected_media_id.trim()
+				: ctx.request.body.selected_media_id;
 			const cleanFirst = (firstname || '').trim();
 			const cleanLast = (lastname || '').trim();
 			const cleanEmail = (email || '').trim();
@@ -591,6 +628,23 @@ class Routes {
 			const cleanTheme = templateHelper.activeThemes.hasOwnProperty(theme)
 				? theme
 				: (SiteConfig.default_theme || templateHelper.currentTheme);
+			let selectedMediaId = null;
+			if (rawSelectedMediaId !== undefined && rawSelectedMediaId !== '') {
+				if (!/^\d+$/.test(String(rawSelectedMediaId))) {
+					await this.showEditProfile(ctx, username, 'The selected profile picture is invalid.', ctx.request.body);
+					return;
+				}
+				selectedMediaId = Number(rawSelectedMediaId);
+				if (!Number.isSafeInteger(selectedMediaId) || selectedMediaId <= 0) {
+					await this.showEditProfile(ctx, username, 'The selected profile picture is invalid.', ctx.request.body);
+					return;
+				}
+				const userMedia = await myuser.getUserMedia(ctx.session.user.id);
+				if (!userMedia.some(media => media.id === selectedMediaId)) {
+					await this.showEditProfile(ctx, username, 'The selected profile picture is not one of your photos.', ctx.request.body);
+					return;
+				}
+			}
 
 			if (!cleanFirst || !cleanLast) {
 				await this.showEditProfile(ctx, username, 'First name and Last name are required.', ctx.request.body);
@@ -609,13 +663,53 @@ class Routes {
 				return;
 			}
 
-			const updated = await myuser.updateUser(ctx.session.user.id, {
-				firstname: cleanFirst,
-				lastname: cleanLast,
-				email: cleanEmail,
-				bio: cleanBio,
-				theme: cleanTheme
-			});
+			const profileFile = ctx.request.body.profile_image;
+			let imageInfo = null;
+			let imagePath = null;
+			if (profileFile) {
+				if (!Buffer.isBuffer(profileFile.data) || profileFile.data.length === 0) {
+					await this.showEditProfile(ctx, username, 'The selected image is empty or invalid.', ctx.request.body);
+					return;
+				}
+				if (profileFile.data.length > 5 * 1024 * 1024) {
+					await this.showEditProfile(ctx, username, 'Profile images must be 5 MB or smaller.', ctx.request.body);
+					return;
+				}
+				const imageType = getImageType(profileFile.data);
+				if (!imageType) {
+					await this.showEditProfile(ctx, username, 'Upload a valid PNG, JPEG, GIF, or WebP image.', ctx.request.body);
+					return;
+				}
+				const fileName = `${crypto.randomUUID()}.${imageType.extension}`;
+				imageInfo = {
+					file_name: fileName,
+					mime_type: imageType.mimeType,
+					file_size: profileFile.data.length
+				};
+				imagePath = path.join(uploadsDir, fileName);
+				await fs.promises.mkdir(uploadsDir, { recursive: true });
+				await fs.promises.writeFile(imagePath, profileFile.data, { flag: 'wx' });
+			}
+
+			let updated;
+			try {
+				updated = await myuser.updateUser(ctx.session.user.id, {
+					firstname: cleanFirst,
+					lastname: cleanLast,
+					email: cleanEmail,
+					bio: cleanBio,
+					theme: cleanTheme
+				}, imageInfo, selectedMediaId);
+			} catch (error) {
+				if (imagePath) {
+					try {
+						await fs.promises.unlink(imagePath);
+					} catch (cleanupError) {
+						console.error('Error removing unreferenced profile image:', cleanupError);
+					}
+				}
+				throw error;
+			}
 
 			// Update session with fresh details
 			ctx.session.user = updated;
@@ -730,7 +824,7 @@ class Routes {
 			} else {
 				const currentUrl = ctx.req.url;
 				list.forEach(person => {
-					const initials = getInitials(person.firstname, person.lastname, person.login);
+					const avatar = getAvatarMarkup(person, 'conn-avatar');
 					const safeFirst = escapeHtml(person.firstname);
 					const safeLast = escapeHtml(person.lastname);
 					const safeLogin = escapeHtml(person.login);
@@ -770,7 +864,7 @@ class Routes {
 					connectionsHtml += `
 						<div class="connection-item">
 							<a href="/profile/${encodeURIComponent(person.login)}" class="conn-user-info">
-								<div class="conn-avatar">${initials}</div>
+								${avatar}
 								<div class="conn-name-block">
 									<div class="conn-fullname">${safeFirst} ${safeLast}</div>
 									<div class="conn-username">@${safeLogin}</div>
@@ -841,6 +935,7 @@ class Routes {
 					contact_login: activeContact.login,
 					contact_firstname: activeContact.firstname,
 					contact_lastname: activeContact.lastname,
+					contact_profile_image: activeContact.profile_image,
 					last_message: 'Start a new conversation...',
 					last_message_time: new Date().toISOString(),
 					last_sender_id: null,
@@ -855,7 +950,12 @@ class Routes {
 			} else {
 				convList.forEach(conv => {
 					const isActive = activeContact && activeContact.id === conv.contact_id;
-					const initials = getInitials(conv.contact_firstname, conv.contact_lastname, conv.contact_login);
+					const avatar = getAvatarMarkup({
+						firstname: conv.contact_firstname,
+						lastname: conv.contact_lastname,
+						login: conv.contact_login,
+						profile_image: conv.contact_profile_image
+					}, 'conv-avatar');
 					const hasUnread = conv.unread_count > 0;
 					const unreadBadge = hasUnread ? `<span class="conv-unread-badge">${conv.unread_count}</span>` : '';
 					const timeStr = conv.last_message_time
@@ -864,7 +964,7 @@ class Routes {
 
 					convItemsHtml += `
 						<a href="/messages/${encodeURIComponent(conv.contact_login)}" class="chat-conv-item ${isActive ? 'active' : ''} ${hasUnread ? 'unread' : ''}">
-							<div class="conv-avatar">${initials}</div>
+							${avatar}
 							<div class="conv-details">
 								<div class="conv-name">${escapeHtml(conv.contact_firstname)} ${escapeHtml(conv.contact_lastname)}</div>
 								<div class="conv-snippet">${escapeHtml(conv.last_message || '')}</div>
@@ -882,7 +982,7 @@ class Routes {
 			let activeChatHtml = '';
 			if (activeContact) {
 				const thread = await myuser.getThread(currentUserId, activeContact.id);
-				const contactInitials = getInitials(activeContact.firstname, activeContact.lastname, activeContact.login);
+				const contactAvatar = getAvatarMarkup(activeContact, 'chat-header-avatar');
 
 				let bubblesHtml = '';
 				if (thread.length === 0) {
@@ -907,7 +1007,7 @@ class Routes {
 				activeChatHtml = `
 					<div class="chat-main-header">
 						<div class="chat-header-user">
-							<div class="chat-header-avatar">${contactInitials}</div>
+							${contactAvatar}
 							<div class="chat-header-info">
 								<h4>${escapeHtml(activeContact.firstname)} ${escapeHtml(activeContact.lastname)}</h4>
 								<a href="/profile/${encodeURIComponent(activeContact.login)}">@${escapeHtml(activeContact.login)} &bull; View Profile</a>

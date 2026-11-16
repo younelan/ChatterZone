@@ -18,7 +18,18 @@ db.exec(`
     password TEXT NOT NULL,
     confirm TEXT,
     bio TEXT DEFAULT '',
-    theme TEXT DEFAULT ''
+    theme TEXT DEFAULT '',
+    profile_media_id INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS media (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    file_name TEXT NOT NULL UNIQUE,
+    mime_type TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS messages (
@@ -58,6 +69,12 @@ try {
   // Column already exists — safe to ignore
 }
 
+try {
+  db.exec(`ALTER TABLE users ADD COLUMN profile_media_id INTEGER`);
+} catch (e) {
+  // Column already exists — safe to ignore
+}
+
 console.log('Connected to SQLite database at', dbPath);
 
 class SqliteUser {
@@ -89,9 +106,14 @@ class SqliteUser {
     try {
       const keys = Object.keys(query);
       if (keys.length === 0) return null;
-      const whereClause = keys.map(k => `${k} = ?`).join(' AND ');
+      const whereClause = keys.map(k => `u.${k} = ?`).join(' AND ');
       const values = keys.map(k => query[k]);
-      const stmt = db.prepare(`SELECT * FROM users WHERE ${whereClause} LIMIT 1`);
+      const stmt = db.prepare(`
+        SELECT u.*, m.file_name as profile_image
+        FROM users u
+        LEFT JOIN media m ON m.id = u.profile_media_id
+        WHERE ${whereClause} LIMIT 1
+      `);
       const user = stmt.get(...values);
       return user || null;
     } catch (error) {
@@ -112,7 +134,12 @@ class SqliteUser {
 
   async listUsers() {
     try {
-      const stmt = db.prepare(`SELECT * FROM users ORDER BY id ASC`);
+      const stmt = db.prepare(`
+        SELECT u.*, m.file_name as profile_image
+        FROM users u
+        LEFT JOIN media m ON m.id = u.profile_media_id
+        ORDER BY u.id ASC
+      `);
       return stmt.all();
     } catch (error) {
       console.error('Error listing users:', error);
@@ -120,28 +147,63 @@ class SqliteUser {
     }
   }
 
-  async updateUser(id, updateData) {
+  async updateUser(id, updateData, profileImage = null, selectedMediaId = null) {
     try {
-      const stmt = db.prepare(`
-        UPDATE users
-        SET firstname = @firstname,
-            lastname = @lastname,
-            email = @email,
-            bio = @bio,
-            theme = @theme
-        WHERE id = @id
-      `);
-      stmt.run({
-        id,
-        firstname: updateData.firstname,
-        lastname: updateData.lastname,
-        email: updateData.email,
-        bio: updateData.bio || '',
-        theme: updateData.theme || ''
-      });
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        let profileMediaId = null;
+        if (profileImage) {
+          const mediaResult = db.prepare(`
+            INSERT INTO media (user_id, file_name, mime_type, file_size)
+            VALUES (?, ?, ?, ?)
+          `).run(id, profileImage.file_name, profileImage.mime_type, profileImage.file_size);
+          profileMediaId = Number(mediaResult.lastInsertRowid);
+        } else if (selectedMediaId !== null) {
+          const media = db.prepare(`SELECT id FROM media WHERE id = ? AND user_id = ?`).get(selectedMediaId, id);
+          if (!media) throw new Error('Selected profile media does not belong to this user');
+          profileMediaId = Number(media.id);
+        }
+
+        db.prepare(`
+          UPDATE users
+          SET firstname = @firstname,
+              lastname = @lastname,
+              email = @email,
+              bio = @bio,
+              theme = @theme,
+              profile_media_id = COALESCE(@profile_media_id, profile_media_id)
+          WHERE id = @id
+        `).run({
+          id,
+          firstname: updateData.firstname,
+          lastname: updateData.lastname,
+          email: updateData.email,
+          bio: updateData.bio || '',
+          theme: updateData.theme || '',
+          profile_media_id: profileMediaId
+        });
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
       return await this.findUser({ id });
     } catch (error) {
       console.error('Error updating user:', error);
+      throw error;
+    }
+  }
+
+  async getUserMedia(userId) {
+    try {
+      return db.prepare(`
+        SELECT id, file_name, mime_type, file_size, created_at
+        FROM media
+        WHERE user_id = ?
+        ORDER BY created_at DESC, id DESC
+      `).all(userId);
+    } catch (error) {
+      console.error('Error fetching user media:', error);
       throw error;
     }
   }
@@ -174,11 +236,13 @@ class SqliteUser {
           u.login as contact_login,
           u.firstname as contact_firstname,
           u.lastname as contact_lastname,
+          m.file_name as contact_profile_image,
           last_msg.body as last_message,
           last_msg.created_at as last_message_time,
           last_msg.sender_id as last_sender_id,
           COALESCE(unread.cnt, 0) as unread_count
         FROM users u
+        LEFT JOIN media m ON m.id = u.profile_media_id
         JOIN (
           SELECT
             CASE WHEN sender_id = ? THEN recipient_id ELSE sender_id END as other_id,
@@ -313,9 +377,11 @@ class SqliteUser {
   async getFollowers(userId) {
     try {
       const stmt = db.prepare(`
-        SELECT u.id, u.login, u.firstname, u.lastname, u.email, u.bio
+        SELECT u.id, u.login, u.firstname, u.lastname, u.email, u.bio,
+               m.file_name as profile_image
         FROM follows f
         JOIN users u ON f.follower_id = u.id
+        LEFT JOIN media m ON m.id = u.profile_media_id
         WHERE f.following_id = ?
         ORDER BY f.created_at DESC
       `);
@@ -329,9 +395,11 @@ class SqliteUser {
   async getFollowing(userId) {
     try {
       const stmt = db.prepare(`
-        SELECT u.id, u.login, u.firstname, u.lastname, u.email, u.bio
+        SELECT u.id, u.login, u.firstname, u.lastname, u.email, u.bio,
+               m.file_name as profile_image
         FROM follows f
         JOIN users u ON f.following_id = u.id
+        LEFT JOIN media m ON m.id = u.profile_media_id
         WHERE f.follower_id = ?
         ORDER BY f.created_at DESC
       `);
@@ -378,9 +446,10 @@ class SqliteUser {
       if (filter === 'following' && userId) {
         stmt = db.prepare(`
           SELECT p.id, p.user_id, p.content, p.created_at,
-                 u.login, u.firstname, u.lastname
+                 u.login, u.firstname, u.lastname, m.file_name as profile_image
           FROM posts p
           JOIN users u ON p.user_id = u.id
+          LEFT JOIN media m ON m.id = u.profile_media_id
           WHERE p.user_id = ? OR p.user_id IN (
             SELECT following_id FROM follows WHERE follower_id = ?
           )
@@ -390,9 +459,10 @@ class SqliteUser {
       } else {
         stmt = db.prepare(`
           SELECT p.id, p.user_id, p.content, p.created_at,
-                 u.login, u.firstname, u.lastname
+                 u.login, u.firstname, u.lastname, m.file_name as profile_image
           FROM posts p
           JOIN users u ON p.user_id = u.id
+          LEFT JOIN media m ON m.id = u.profile_media_id
           ORDER BY p.created_at DESC, p.id DESC
         `);
         return stmt.all();

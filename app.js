@@ -16,6 +16,7 @@ const MIME_TYPES = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
   '.gif': 'image/gif',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
@@ -38,35 +39,106 @@ function getSession(req, res) {
   return sessions.get(sid);
 }
 
-function parseBody(req) {
-  return new Promise((resolve) => {
-    if (req.method !== 'POST' && req.method !== 'PUT' && req.method !== 'PATCH') {
-      return resolve({});
+function parseMultipartFormData(raw, contentType) {
+  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+  const boundary = boundaryMatch && (boundaryMatch[1] || boundaryMatch[2]).trim();
+  if (!boundary || boundary.length > 200) {
+    throw Object.assign(new Error('Invalid multipart boundary'), { statusCode: 400 });
+  }
+
+  const delimiter = Buffer.from(`--${boundary}`);
+  const separator = Buffer.from('\r\n\r\n');
+  const parsed = {};
+  let cursor = 0;
+  let complete = false;
+  if (!raw.subarray(0, delimiter.length).equals(delimiter)) {
+    throw Object.assign(new Error('Malformed multipart form data'), { statusCode: 400 });
+  }
+  cursor = delimiter.length;
+
+  while (cursor < raw.length) {
+    if (raw.subarray(cursor, cursor + 2).toString() === '--') {
+      complete = true;
+      break;
+    }
+    if (raw.subarray(cursor, cursor + 2).toString() !== '\r\n') {
+      throw Object.assign(new Error('Malformed multipart form data'), { statusCode: 400 });
     }
 
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      const contentType = req.headers['content-type'] || '';
+    const headerStart = cursor + 2;
+    const headerEnd = raw.indexOf(separator, headerStart);
+    if (headerEnd < 0) {
+      throw Object.assign(new Error('Malformed multipart form data'), { statusCode: 400 });
+    }
+    const headers = raw.subarray(headerStart, headerEnd).toString('utf8');
+    const disposition = headers.match(/content-disposition:\s*form-data;([^\r\n]+)/i);
+    const nameMatch = disposition && disposition[1].match(/(?:^|;)\s*name="([^"]*)"/i);
+    if (!nameMatch) {
+      throw Object.assign(new Error('Malformed multipart form data'), { statusCode: 400 });
+    }
 
-      if (contentType.includes('application/json')) {
-        try {
-          return resolve(JSON.parse(raw));
-        } catch {
-          return resolve({});
-        }
-      }
+    const dataStart = headerEnd + separator.length;
+    const nextPart = raw.indexOf(Buffer.from(`\r\n--${boundary}`), dataStart);
+    if (nextPart < 0) {
+      throw Object.assign(new Error('Malformed multipart form data'), { statusCode: 400 });
+    }
+    const data = raw.subarray(dataStart, nextPart);
+    const filenameMatch = disposition[1].match(/(?:^|;)\s*filename="([^"]*)"/i);
+    if (filenameMatch && filenameMatch[1]) {
+      const contentTypeMatch = headers.match(/content-type:\s*([^\r\n]+)/i);
+      parsed[nameMatch[1]] = {
+        originalName: filenameMatch[1],
+        contentType: contentTypeMatch ? contentTypeMatch[1].trim().toLowerCase() : '',
+        data
+      };
+    } else if (!filenameMatch) {
+      parsed[nameMatch[1]] = data.toString('utf8');
+    }
+    cursor = nextPart + 2 + delimiter.length;
+  }
+  if (!complete) {
+    throw Object.assign(new Error('Malformed multipart form data'), { statusCode: 400 });
+  }
+  return parsed;
+}
 
-      // Default to urlencoded form data
-      const parsed = {};
-      const params = new URLSearchParams(raw);
-      for (const [key, value] of params.entries()) {
-        parsed[key] = value;
-      }
-      resolve(parsed);
-    });
-  });
+async function parseBody(req) {
+  if (req.method !== 'POST' && req.method !== 'PUT' && req.method !== 'PATCH') return {};
+
+  const contentType = req.headers['content-type'] || '';
+  const normalizedContentType = contentType.toLowerCase();
+  const chunks = [];
+  let totalSize = 0;
+  const maxRequestSize = normalizedContentType.includes('multipart/form-data')
+    ? 5 * 1024 * 1024 + 128 * 1024
+    : Infinity;
+  for await (const chunk of req) {
+    totalSize += chunk.length;
+    if (totalSize > maxRequestSize) {
+      throw Object.assign(new Error('Request body is too large'), { statusCode: 413 });
+    }
+    chunks.push(chunk);
+  }
+
+  const raw = Buffer.concat(chunks);
+  if (normalizedContentType.includes('multipart/form-data')) {
+    return parseMultipartFormData(raw, contentType);
+  }
+  const text = raw.toString('utf8');
+  if (normalizedContentType.includes('application/json')) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return {};
+    }
+  }
+
+  const parsed = {};
+  const params = new URLSearchParams(text);
+  for (const [key, value] of params.entries()) {
+    parsed[key] = value;
+  }
+  return parsed;
 }
 
 async function serveStaticFile(filePath, res) {
@@ -94,7 +166,15 @@ const server = http.createServer(async (req, res) => {
   const method = req.method;
 
   const session = getSession(req, res);
-  const body = await parseBody(req);
+  let body;
+  try {
+    body = await parseBody(req);
+  } catch (error) {
+    console.error('Error parsing request body:', error);
+    res.writeHead(error.statusCode || 400, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end(error.statusCode === 413 ? 'Request body too large' : 'Invalid request body');
+    return;
+  }
 
   const isGetOrHead = method === 'GET' || method === 'HEAD';
 
@@ -134,14 +214,29 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // 2. Favicon
+    // 2. Uploaded profile images
+    const uploadMatch = pathname.match(/^\/uploads\/([a-f0-9-]{36}\.(?:png|jpg|gif|webp))$/);
+    if (uploadMatch && isGetOrHead) {
+      const filePath = path.join(__dirname, 'uploads', uploadMatch[1]);
+      const served = await serveStaticFile(filePath, res);
+      if (served) {
+        console.log(`  <-- ${method} ${pathname} 200 ${Date.now() - start}ms`);
+        return;
+      }
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Not Found');
+      console.log(`  <-- ${method} ${pathname} 404 ${Date.now() - start}ms`);
+      return;
+    }
+
+    // 3. Favicon
     if (pathname === '/favicon.ico') {
       res.writeHead(204);
       res.end();
       return;
     }
 
-    // 3. Theme assets: /themes/:theme/:file
+    // 4. Theme assets: /themes/:theme/:file
     const themeMatch = pathname.match(/^\/themes\/([^\/]+)\/([^\/]+)$/);
     if (themeMatch && isGetOrHead) {
       ctx.params = { theme: themeMatch[1], file: themeMatch[2] };

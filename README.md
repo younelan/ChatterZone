@@ -1,8 +1,8 @@
-# Node Login Demo
+# Chatter Zone Demo
 -----------------
 This is a Simple Password protected **demo** of a **node.js** password protected Member Zone.
 
-This is by no means complete but should give you an idea to get started with form submission, validation, themes, mongoose mongo access, sessions and authentication
+This is by no means complete but should give you an idea to get started with form submission, validation, themes, sqlite access, sessions and authentication
 
 - If you have a single theme, you probably wanna use something like pug 
 
